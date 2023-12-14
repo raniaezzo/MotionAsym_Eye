@@ -1,0 +1,623 @@
+clear all; clc;
+homedir = '/Users/rania/Downloads/MS_Project';
+subject = {'S01','S02','S03','S04','S05','S06','S07','S08'}; 
+condition = {'Full_distance_non_radialtangential','Full_distance_radialtangential'};
+direction = {'VU','VL','HL','HR','LL','LR','UL','UR'};
+%edf2asc = 'F:\RadialBias_pilot1-main\RadialBias_pilot1-main\Analysis\edf2asc';
+c={'Switched','Original'};
+Trial_w = [];
+Time_point = zeros(6,2,8,3);
+Value = zeros(6,2,8,3);
+tilts = [0.5, 1, 2, 4, 8];
+
+reboundVals = nan(numel(subject), numel(tilts), 2);
+rtVals = nan(numel(subject), numel(tilts), 2);
+
+for ii = 1:8 %1:8 %6 (new method tested on 2,3,4,6,7,8) % but 6 has exception added
+    
+    for cc = 1:2 % (cardinal / oblique)
+        if cc == 1
+            motioncon = 'cardinal';
+        elseif cc == 2
+            motioncon = 'oblique';
+        end
+        
+        if cc==1
+            subdirections = 1 : 4;
+        elseif cc==2
+            subdirections = 5 : 8;
+        end
+    
+        if ii == 5
+            continue
+        end
+
+        for tt = 1:5 % tilt angle
+
+            tilt = tilts(tt);
+            subject_meanrate_tilt = [];
+            rt_median_tilt = [];
+
+            for kk = subdirections 
+                
+                for jj = 1 : 2 % switch or orig
+                    disp('~~')
+                    if (ii == 7 || ii == 8) && (jj == 1) % no data
+                        continue
+                    elseif ii == 7 && strcmp(direction{kk}, 'VL') % EYETRACKER MISSING DATA
+                        continue % this file has issues (empty MS rate due to truncated data)
+                    elseif ii == 8 && strcmp(direction{kk}, 'LL')
+                        continue
+                    end
+
+                    main_folder = fullfile(homedir,'Data_DI_wEYE', subject{ii}, ...
+                            'RawData', condition{jj}, 'Block1');
+                    cd(fullfile(main_folder, 'eyedata'));
+                    %rate_name = [subject{ii},'_',c{2/jj},'_',direction{kk},'_rate.mat'];
+                    rate_name = [subject{ii},'_',c{2/jj},'_',direction{kk},'_events.mat'];
+                    edf_name = dir(sprintf('*%s*.edf', direction{kk})).name; %direction{jj})).name;
+                    edf_path = fullfile(main_folder,'eyedata',edf_name);
+                    msg_filepath=replace(edf_path,'edf','msg');
+                    samplingRateData=findSamplingRate(msg_filepath);
+        %             x=1:1000/samplingRateData:2500;
+
+                    if ii==3 && kk==1 && jj==1 % missing data
+                        continue
+                    else
+                        load(rate_name)
+                    end
+
+                    % filter by tilt angle
+                    tab_path = fullfile('MATs', replace(edf_name, '.edf', '_tab_new_outside_blink.mat'));
+                    load(tab_path)
+                    
+                    % remove rare instance of left over 0 in tab file
+                    tab = tab(tab(:,11)~=0,:);
+                    
+                    [I, ~] = find(tab(:,11)==tilt);
+                    
+                    EVENTS = EVENTS(I,:);
+                    
+                    RT = tab(I,14);
+
+                    rate = nanmean(EVENTS,1)*60;
+
+                    % interpolate is SamplingRate=500
+
+                    [~, cols] = size(EVENTS);
+
+                    if samplingRateData ==500
+                        nI=1;                 % number points to insert
+                        N=numel(rate);        % initial vector size
+                        NN=(N-1)*nI+N;        % new N for augmented v
+                        xv=linspace(1,N,NN+1);    % uniform spacing along 1:N NN points
+                        %vv=interp1(1:N,rate,xv); % linear interpolation
+                        vvv=interp1(1:N,rate,xv,'pchip'); % or pchip interpolation
+    %                     figure
+    %                     plot(rate,'o-')
+    %                     hold on
+    %                     plot(xv,vvv,'d-')
+    %                     legend('Original','Linear','PChip')
+                        rate = vvv;
+                    elseif samplingRateData ==2000
+                        rate = rate(1:2:end); 
+                    end
+
+                    if ii ==5
+                        rate=rate(1:length(rate)*0.8);
+                    end
+
+                    size(rate); % for debugging
+
+                    subject_meanrate_tilt = [subject_meanrate_tilt; rate];
+                    rt_median_tilt = [rt_median_tilt; RT];
+
+                end
+            end
+
+            rate = nanmean(subject_meanrate_tilt,1);
+            rt_final = nanmedian(rt_median_tilt,1); % length = 160 * 8
+
+
+            titlename = [subject{ii}]; %,' ',c{jj},' ',direction{kk}];
+            time=[500,2000];
+            pa_pass=0.001;
+            temporalthresh=70;
+            onset=1;
+            stepsize=1;
+
+            [t1,t2,t3,y_fil] = infl(rate,time,pa_pass,temporalthresh,onset,stepsize, subject{ii});
+
+            if isempty(t3)
+                t3 = 2000;
+                trial = [ii,jj,kk];
+                Trial_w = [Trial_w;trial];
+            end
+            x=1:length(rate);
+            x=x./(length(rate)/2500);
+            if ii == 5                 
+                y_fil = [y_fil,rate(length(rate)*0.8+1:length(rate))];
+            end
+            v = rate([t1,t2,t3]);
+            t=[t1,t2,t3]*2500/length(rate);
+            Time_point(ii,jj,kk,:) = t;
+            Value(ii,jj,kk,:) = v;
+            save('Point_Value.mat','Value')
+            save('Point_time.mat','Time_point')
+            save('No_inflection.mat','Trial_w')
+
+        %% for draw figure
+            figure
+            subplot(2,1,1)
+            plot(x,rate)
+            subplot(2,1,2)
+            plot(x,y_fil)
+            hold on 
+            xline(t1/(length(rate)/2500))
+            hold on 
+            xline(t2/(length(rate)/2500))
+            hold on 
+            xline(t3/(length(rate)/2500), 'r')
+            title([titlename 'tilt' num2str(tilt)])
+            
+            figpath=fullfile('/Users/rania/Desktop/MS_figures',subject{ii}, 'png');
+            name = [figpath,'/',subject{ii},'_',c{jj},'_',motioncon,'tilt',num2str(tilt),'_reboundEstimates.png'];
+            saveas(gca,name) 
+            
+            
+            name = strrep(name, 'png', 'fig');
+            saveas(gca,name)
+            close all;
+            
+        
+        reboundVals(ii, tt, cc) = t3;
+        rtVals(ii, tt, cc) = rt_final;
+        
+        end
+    end
+end
+
+figure
+plot(x(1000:end),y_fil(1000:end), 'k', 'LineWidth',2)
+hold on
+xline(1300, 'LineWidth',2, 'Color', [.5 .5 .5])
+hold on
+xline(1800, 'LineWidth',2, 'Color', [.5 .5 .5])
+
+%%
+
+% corrections (this subject has very bad fit)
+% reboundVals(6,:,1) = [1723, 1658, 1692, 1681, 1608];
+% reboundVals(6,:,2) = [2247, 1999, 1688, 1645, 1705];
+
+colors = {[51, 34, 136]/255, [17, 119, 51]/255, [68, 170, 153]/255, ...
+    [136, 204, 238]/255, [221, 204, 119]/255, ...
+    [204, 102, 119]/255, [170, 68, 153]/255, [136, 34 85]/255};
+
+baseline = (nanmean(reboundVals(:,:,1),2)+nanmean(reboundVals(:,:,2),2))/2;
+
+figure
+card_vals = reboundVals(:,:,1)-baseline;
+oblique_vals = reboundVals(:,:,2)-baseline;
+Cardyvals = nanmean(card_vals);
+card_sem = nanstd(card_vals)/sqrt(7);      % N hard coded
+for ta=1:5
+    
+    semlength = card_sem(ta);
+    currentMean = Cardyvals(ta);
+    
+    tiltposition = ones(length(currentMean-semlength:currentMean+semlength),1)*ta;
+    plot(currentMean-semlength:currentMean+semlength,tiltposition', 'Color', [127, 191, 123]/255, 'LineWidth',3,'HandleVisibility','off');
+    hold on
+end
+hold on
+s1 = scatter(Cardyvals, 1:5, 'o');
+s1.MarkerEdgeColor = [127, 191, 123]/255;
+s1.MarkerFaceColor = [1 1 1]; %[127, 191, 123]/255;
+s1.SizeData = 150;
+s1.LineWidth = 3;
+hold on
+
+obl_sem = nanstd(oblique_vals)/sqrt(7);      % N hard coded
+Oblyvals = nanmean(oblique_vals);
+for ta=1:5
+    
+    semlength = obl_sem(ta);
+    currentMean = Oblyvals(ta);
+    
+    tiltposition = (zeros(length(currentMean-semlength:currentMean+semlength),1)+ta)-.2;
+    plot(currentMean-semlength:currentMean+semlength,tiltposition', 'Color', [175, 141, 195]/255, 'LineWidth',3,'HandleVisibility','off');
+    hold on
+end
+s2 = scatter(Oblyvals, [1:5]+zeros(1,5)-.2, 'o');
+s2.MarkerEdgeColor = [175, 141, 195]/255;
+s2.MarkerFaceColor = [1 1 1]; %[175, 141, 195]/255;
+s2.SizeData = 150;
+s2.LineWidth = 3;
+[h,icons] = legend('cardinal','oblique', 'Location','Southwest');
+% icons = findobj(icons,'Marker','none','-xor');
+% set(icons,'MarkerSize',20);
+
+ax = gca;
+xlabel('Rebound - subject mean (ms)')
+ylabel('Offset magnitude (°)')
+ax.YTick = 1:5;
+ax.YTickLabel = {'0.5', '1', '2', '4', '8'};
+ylim([0 6])
+
+ax.FontSize = 20;
+ax.LineWidth = 2;
+box off
+fig1 = gcf;
+fig1.Position = [874 472 567 322];
+
+
+%% Check interaction?
+
+card_test = card_vals(~isnan(card_vals(:,1)),:);
+obl_test = oblique_vals(~isnan(oblique_vals(:,1)),:);
+
+[IND, ~] = size(card_test);
+
+figure
+tmpX = [0.5 1 2 4 8]; %1:5;
+cardinalslopes = [];
+for sub = 1 : IND 
+    tmpY = card_test(sub,:);
+    c = polyfit(tmpX,tmpY,1);
+    y_est = polyval(c,tmpX);
+    plot(tmpX,y_est); %,'Color',colornew{sub}/255,'LineWidth',2)
+    hold on
+    cardinalslopes = [cardinalslopes c(2)];
+end
+hold on
+
+tmpX = [9.5 10 12 14 18]; 
+obliqueslopes = [];
+for sub = 1 : IND 
+    tmpY = obl_test(sub,:);
+    c = polyfit(tmpX,tmpY,1);
+    y_est = polyval(c,tmpX);
+    p2 = plot(tmpX,y_est); %,'Color',colornew{sub}/255,'LineWidth',2);
+    hold on
+    obliqueslopes = [obliqueslopes c(2)];
+end
+
+disp('pval for interaction between cardinal and oblique tilt slopes')
+interac = ttest(cardinalslopes,obliqueslopes);
+[a_rej,b_pval,c_ci,d_struc] = ttest(cardinalslopes,obliqueslopes);
+
+[a,b,c,d] = ttest(mean(card_test,2), mean(obl_test,2), 'tail', 'left');
+
+bothslopes = (cardinalslopes+obliqueslopes)/2;
+both_sem = std(bothslopes)/sqrt(IND);
+both_tstat = mean(bothslopes)/both_sem;
+p_both = (1-tcdf(both_tstat,IND-1)); % *2
+
+%% Plot card / oblique (combining tilts)
+
+c_combined = mean(card_test,2);
+o_combined = mean(obl_test,2);
+
+c_sem = nanstd(c_combined)/sqrt(7);      % N hard coded
+cvals = nanmean(c_combined);
+
+o_sem = nanstd(o_combined)/sqrt(7);      % N hard coded
+ovals = nanmean(o_combined);
+ 
+figure
+
+% plot(cvals-c_sem:cvals+c_sem,ones(length(cvals-c_sem:cvals+c_sem),1)', 'Color', [127, 191, 123]/255, 'LineWidth',3,'HandleVisibility','off');
+% hold on
+% plot(ovals-o_sem:ovals+o_sem,zeros(length(ovals-o_sem:ovals+o_sem),1)', 'Color', [175, 141, 195]/255, 'LineWidth',3,'HandleVisibility','off');
+% hold on
+
+hold on
+
+r = rectangle('Position',[cvals-c_sem 1-.25 2*c_sem .5]);
+r.FaceColor = [[127, 191, 123]/255 .5];
+r.EdgeColor = [1 1 1]; %[[127, 191, 123]/255 .5];
+r.LineWidth = 2;
+hold on
+r = rectangle('Position',[ovals-o_sem 0-.25 2*o_sem .5]);
+r.FaceColor = [[175, 141, 195]/255 .5];
+r.EdgeColor = [1 1 1]; %[[175, 141, 195]/255 .5];
+r.LineWidth = 2;
+
+hold on
+
+s2 = scatter(c_combined, ones(length(c_combined),1));
+s2.MarkerEdgeColor = [1 1 1]; %[127, 191, 123]/255;
+s2.MarkerFaceColor = [127, 191, 123]/255; %[127, 191, 123]/255;
+s2.SizeData = 100;
+s2.LineWidth = 2;
+hold on
+s3 = scatter(o_combined, zeros(length(o_combined),1));
+s3.MarkerEdgeColor = [1 1 1]; %[175, 141, 195]/255;
+s3.MarkerFaceColor = [175, 141, 195]/255; %[175, 141, 195]/255;
+s3.SizeData = 100;
+s3.LineWidth = 2;
+
+ylim([-0.5 1.5])
+xlabel('rebound')
+ax = gca;
+%ax.XTickLabel = {};
+ax.YTick = [0 1];
+ax.FontSize = 20;
+ax.LineWidth = 2.5;
+% fig1= gcf;
+% fig1.Position = [147 589 556 175];
+fig1= gcf;
+fig1.Position = [147 513 556 251];
+
+sem_deff = std(c_combined-o_combined)/sqrt(IND);
+hold on
+errorbar(mean(c_combined), .5, sem_deff, 'horizontal', 'LineWidth',2, 'Color',[.5 .5 .5]);
+
+%% slopes only
+
+figure
+tmpX = [0.5 1 2 4 8]; %1:5;
+allslopes = []; y_ests = [];
+alldata = (card_test+obl_test)/2;
+for sub = 1 : IND 
+    tmpY = alldata(sub,:);
+    c = polyfit(tmpX,tmpY,1);
+    y_est = polyval(c,tmpX);
+    p1 = patchline(y_est,tmpX,'edgecolor','k','linewidth',3,'edgealpha',0.3);
+    hold on
+    y_ests = [y_ests; y_est];
+    allslopes = [allslopes c(2)];
+end
+hold on
+p1 = patchline(median(y_ests),tmpX,'edgecolor',[0 0 0],'linewidth',4,'edgealpha',1);
+ax = gca;
+
+
+%% All data with slope and direction info
+
+% mean RT per subject
+rtVals_baseline = 1000*(nanmean(rtVals(:,:,1),2)+nanmean(rtVals(:,:,2),2))/2;
+
+% mean RT STD per subject
+rtVals_std = 1000*(nanstd(rtVals(:,:,1)')+nanstd(rtVals(:,:,2)'))/2;
+
+% xxx zscore RT per subject
+card_rt_abs = (rtVals(:,:,1)*1000- rtVals_baseline); % ./ repmat(rtVals_std',[1,5]);
+obl_rt_abs = (rtVals(:,:,2)*1000 - rtVals_baseline); % ./ repmat(rtVals_std',[1,5]);
+
+% mean Rebound STD per subject
+reboundVals_std = (nanstd(reboundVals(:,:,1)')+nanstd(reboundVals(:,:,2)'))/2;
+
+% zscore Rebound per subject
+card_vals_abs = reboundVals(:,:,1) - baseline; % ./ repmat(reboundVals_std',[1,5]);
+oblique_vals_abs = reboundVals(:,:,2) - baseline; % ./ repmat(reboundVals_std',[1,5]);
+
+
+figure
+
+alphalevel = 0.1;
+szgain1 = [20 60 100 140 180]; szgain2 = szgain1; % flip();
+
+for ti=1:numel(tilts)
+    
+    szgainCard = szgain1(ti);
+    szgainObl = szgain2(ti);
+    
+    s5 = scatter(card_rt_abs(:, ti), card_vals_abs(:, ti));
+    s5.MarkerEdgeColor = [127, 191, 123]/255; %colors{si}; %
+    s5.MarkerFaceColor = [127, 191, 123]/255; %colors{si};
+    s5.MarkerFaceAlpha = alphalevel;
+    s5.SizeData = szgainCard;
+
+    hold on
+    s6 = scatter(obl_rt_abs(:, ti), oblique_vals_abs(:, ti));
+    s6.MarkerEdgeColor = [175, 141, 195]/255; %colors{si}; %
+    s6.MarkerFaceColor = [175, 141, 195]/255; %colors{si};
+    s6.MarkerFaceAlpha = alphalevel; %1-alphalevel;
+    s6.SizeData = szgainObl;
+    
+    alphalevel = alphalevel + 0;
+end
+
+hold on
+
+tmpA = nanmean(card_rt_abs,1);
+tmpB = nanmean(obl_rt_abs,1);
+tmpX = nanmean(card_vals_abs,1);
+tmpY = nanmean(oblique_vals_abs,1);
+
+sizetmp = 100;
+for pi=1:length(tmpA)
+    s3 = scatter(tmpA(pi), tmpX(pi), '+');
+    s3.MarkerEdgeColor = [127, 191, 123]/255;
+    s3.SizeData = sizetmp;
+    s3.LineWidth = 3;
+    hold on
+    s4 = scatter(tmpB(pi), tmpY(pi), '+');
+    s4.MarkerEdgeColor = [175, 141, 195]/255;
+    s4.SizeData = sizetmp;
+    s4.LineWidth = 3;
+    sizetmp = sizetmp+250;
+    hold on
+end
+
+yline(0, 'k--')
+hold on
+xline(0, 'k--')
+
+ax = gca;
+ax.FontSize = 20;
+ax.LineWidth = 2;
+box off
+fig1 = gcf;
+fig1.Position = [874 472 567 322];
+
+%ax.XTickLabel = {'150' '' '' '' ''};
+
+ylabel('Rebound - subject mean (ms)')
+xlabel('Response time - subject mean (ms)')
+
+% s5 = scatter(reshape(card_rt_abs.',1,[]), reshape(card_vals_abs.',1,[]));
+% s5.MarkerEdgeColor = [127, 191, 123]/255;
+% s5.SizeData = 50;
+% hold on 
+% s6 = scatter(reshape(obl_rt_abs.',1,[]), reshape(oblique_vals_abs.',1,[]));
+% s6.MarkerEdgeColor = [175, 141, 195]/255;
+% s6.SizeData = 50;
+
+
+%RTcard_vals = rtVals(:,:,1); %-rtVals_baseline;
+%RToblique_vals = rtVals(:,:,2); %-rtVals_baseline;
+%RT_cardyvals = nanmean(RTcard_vals);
+%RT_oblyvals = nanmean(RToblique_vals);
+
+% s3 = scatter(RT_cardyvals, Cardyvals, 'o');
+% s3.MarkerEdgeColor = [175, 141, 195]/255;
+% hold on
+% s3 = scatter(RT_oblyvals, Oblyvals, 'o');
+% s3.MarkerEdgeColor = [175, 141, 195]/255;
+
+%%
+
+%% All data with slope and direction info
+
+% mean RT per subject
+rtVals_baseline = 1000*(nanmean(rtVals(:,:,1),2)+nanmean(rtVals(:,:,2),2))/2;
+
+% mean RT STD per subject
+rtVals_std = 1000*(nanstd(rtVals(:,:,1)')+nanstd(rtVals(:,:,2)'))/2;
+
+% xxx zscore RT per subject
+card_rt_abs = (rtVals(:,:,1)*1000- rtVals_baseline); % ./ repmat(rtVals_std',[1,5]);
+obl_rt_abs = (rtVals(:,:,2)*1000 - rtVals_baseline); % ./ repmat(rtVals_std',[1,5]);
+
+% mean Rebound STD per subject
+reboundVals_std = (nanstd(reboundVals(:,:,1)')+nanstd(reboundVals(:,:,2)'))/2;
+
+% zscore Rebound per subject
+card_vals_abs = reboundVals(:,:,1) - baseline; % ./ repmat(reboundVals_std',[1,5]);
+oblique_vals_abs = reboundVals(:,:,2) - baseline; % ./ repmat(reboundVals_std',[1,5]);
+
+alphalevel = 0.5;
+szgain1 = [20 60 100 140 180]; szgain2 = szgain1; % flip();
+
+card_rt_combinedtilt = nanmean(card_rt_abs,2);
+card_rb_combinedtilt = nanmean(card_vals_abs,2);
+obl_rt_combinedtilt = nanmean(obl_rt_abs,2);
+obl_rb_combinedtilt = nanmean(oblique_vals_abs,2);
+
+figure
+s5 = scatter(card_rt_combinedtilt, card_rb_combinedtilt);
+% s5.MarkerEdgeColor = [127, 191, 123]/255; %colors{si}; %
+% s5.MarkerFaceColor = [127, 191, 123]/255; %colors{si};
+% s5.MarkerFaceAlpha = alphalevel;
+% s5.SizeData = 100;
+s5.MarkerEdgeColor = [1 1 1]; %[175, 141, 195]/255;
+s5.MarkerFaceColor = [127, 191, 123]/255; %[175, 141, 195]/255;
+s5.SizeData = 100;
+
+hold on
+s6 = scatter(obl_rt_combinedtilt, obl_rb_combinedtilt);
+% s6.MarkerEdgeColor = [175, 141, 195]/255; %colors{si}; %
+% s6.MarkerFaceColor = [175, 141, 195]/255; %colors{si};
+% s6.MarkerFaceAlpha = alphalevel; %1-alphalevel;
+% s6.SizeData = 100;
+s6.MarkerEdgeColor = [1 1 1]; %[175, 141, 195]/255;
+s6.MarkerFaceColor = [175, 141, 195]/255; %[175, 141, 195]/255;
+s6.SizeData = 100;
+
+hold on
+
+% tmpA = nanmean(card_rt_combinedtilt,2);
+% tmpB = nanmean(obl_rt_combinedtilt,2);
+% tmpX = nanmean(card_rb_combinedtilt,2);
+% tmpY = nanmean(obl_rb_combinedtilt,2);
+
+sizetmp = 500;
+s3 = scatter(nanmean(card_rt_combinedtilt), nanmean(card_rb_combinedtilt), '+');
+s3.MarkerEdgeColor = [127, 191, 123]/255;
+s3.SizeData = sizetmp;
+s3.LineWidth = 3;
+hold on
+s4 = scatter(nanmean(obl_rt_combinedtilt), nanmean(obl_rb_combinedtilt), '+');
+s4.MarkerEdgeColor = [175, 141, 195]/255;
+s4.SizeData = sizetmp;
+s4.LineWidth = 3;
+hold on
+
+yline(0, 'k--')
+hold on
+xline(0, 'k--')
+
+ax = gca;
+ax.FontSize = 20;
+ax.LineWidth = 2;
+box off
+fig1= gcf;
+fig1.Position = [147 513 556 251];
+
+%ax.XTickLabel = {'150' '' '' '' ''};
+
+ylabel('Rebound - subject mean (ms)')
+xlabel('Response time - subject mean (ms)')
+
+
+all_rt = [card_rt_combinedtilt; obl_rt_combinedtilt];
+all_rb = [card_rb_combinedtilt; obl_rb_combinedtilt];
+
+all_rt = all_rt(~isnan(all_rt));
+all_rb = all_rb(~isnan(all_rb));
+
+
+%% mean
+
+% figure
+% 
+% 
+% all_vals = (reboundVals(:,:,1)+reboundVals(:,:,2))/2;
+% yvals = nanmean(all_vals);
+% all_sem = nanstd(all_vals)/sqrt(7);      % N hard coded
+% for ta=1:5
+%     
+%     semlength = all_sem(ta);
+%     currentMean = yvals(ta);
+%     
+%     tiltposition = ones(length(currentMean-semlength:currentMean+semlength),1)*ta;
+%     plot(currentMean-semlength:currentMean+semlength,tiltposition', 'Color', [0 0 0]/255, 'LineWidth',2);
+%     hold on
+% end
+% hold on
+% s1 = scatter(yvals, 1:5, 'o');
+% s1.MarkerEdgeColor = [0 0 0];
+% s1.MarkerFaceColor = [1 1 1]; %[127, 191, 123]/255;
+% s1.SizeData = 100;
+% s1.LineWidth = 2;
+% hold on
+% 
+% ax = gca;
+% xlabel('Onset of Suppression Rebound (ms)')
+% ylabel('Tilt Angle')
+% ax.YTick = 1:5;
+% ax.YTickLabel = {'0.5', '1', '2', '4', '8'};
+% ylim([0 6])
+
+%%
+figure
+for si=1:8
+    for mc=1:2
+        if mc == 1
+            plot(reboundVals(si,:,mc),1:5, 'Color', colors{si}, 'LineWidth',2);
+        elseif mc == 2
+            plot(reboundVals(si,:,mc),1:5, ':', 'Color', colors{si}, 'LineWidth',2);
+        end
+        hold on
+    end
+end
+
+ax = gca;
+xlabel('Onset of Suppression Rebound (ms)')
+ylabel('Tilt Angle')
+ax.YTick = 1:5;
+ax.YTickLabel = {'0.5', '1', '2', '4', '8'};
+ylim([0 6])

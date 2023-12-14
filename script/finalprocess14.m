@@ -1,0 +1,463 @@
+%Cardinal vs. Oblique from diff_con2.m script
+%% this script is changed by plot_figure_diffcon2.m and this is for plot MS count figure
+clc; clear all;
+homedir = '/Volumes/Vision/UsersShare/Rania/MS_Project';
+subject = {'S01','S02','S03','S04','S05','S06','S07','S08'}; condition = {'Full_distance_non_radialtangential', 'Full_distance_radialtangential'}; 
+direction = {'VU','VL','HL','HR','LL','LR','UL','UR'};
+location = {'UR','LL','UL','LR','VU','VL','HR','HL'};
+direction_name = {'VU_new','VL_new','HL_new','HR_new','LL_new','LR_new','UL_new','UR_new'};
+y_cond1=zeros(5,6);
+y_cond2=zeros(5,6);
+y_cond3=zeros(5,6);
+y_cond4=zeros(5,6);
+Y_con1 = 0 ; 
+Y_con2 = 0 ; 
+Y_con3 = 0 ; 
+Y_con4 = 0 ; 
+oblique_cum = zeros(5,8);
+cardinal_cum = zeros(5,8);
+for kk = 1 : 8 
+    
+    if kk == 5         %|| kk == 7
+        continue
+    end
+%     
+%     Y_con1 = 0 ; 
+%     Y_con2 = 0 ; 
+%     Y_con3 = 0 ; 
+%     Y_con4 = 0 ; 
+%     Orig = zeros(10,2);
+%     Swit = zeros(10,2);
+    Card = zeros(10,2);
+    Obli = zeros(10,2);
+    tab_total = [] ;
+    MS_total = [] ; 
+    sample=[];
+%     ACC_W=[];
+%     ACC_NW=[];
+%     REC_W=[];
+%     REC_NW=[];
+    ACC_W=zeros(4,4);
+    ACC_NW=zeros(4,4);
+    REC_W=zeros(4,4);
+    REC_NW=zeros(4,4);
+    Y=zeros(10,2);
+    % Tab_w_cl=[];
+    % Tab_nw_cl=[];
+    % Tab_w_ncl=[];
+    % Tab_nw_ncl=[];
+    D_w=zeros(4,4);
+    D_nw=zeros(4,4);
+   %calculate numbers of different condition
+    w_num_con1 = 0;
+    nw_num_con1= 0;
+    w_num_con2 = 0;
+    nw_num_con2= 0;
+    w_num_con3 = 0;
+    nw_num_con3= 0;
+    w_num_con4 = 0;
+    nw_num_con4= 0;
+    
+        
+    padding_time=[0 0]; %[0,100];
+    for i = 1 : 2
+        if kk > 6 & i == 1 
+            continue
+        end
+        for j = 1 : 8
+
+            main_folder = fullfile(homedir, 'Data_DI_wEYE', subject{kk}, ...
+                 'RawData', condition{i}, 'Block1');
+            cd(fullfile(main_folder, 'eyedata'));
+            edf_name = dir(sprintf('*%s*.edf', direction{j})).name;
+            edf_path = fullfile(main_folder,'eyedata',edf_name);
+            msg_filepath=replace(edf_path,'edf','msg');
+            samplingRateData=findSamplingRate(msg_filepath);
+            sample=[sample,samplingRateData];
+            MATpath = fullfile(main_folder, 'eyedata','MATs');
+    %         cd(fullfile(main_folder, 'eyedata','MATs'));
+    %         ms_name = dir(sprintf('%s.mat', direction{j})).name;
+            ms_path= fullfile(MATpath,sprintf('%s.mat', direction_name{j}) );
+            load(ms_path);
+    %         MS_TEMP(:,10)=MS_TEMP(:,10)+ ((i-1)*8 + (j-1))*800;   
+    %         MS_total=[MS_total;MS_TEMP];
+    %         MATpath = fullfile(main_folder, 'eyedata','MATs');
+            tab_path = fullfile(MATpath, replace(edf_name, '.edf', '_tab_new_outside_blink.mat'));
+            load(tab_path)
+    %         tab(:,1)=tab(:,1)+ ((i-1)*8 + (j-1))*800;  
+    %         tab_total=[tab_total;tab]
+    
+            % just added 5-14-2023
+            load(fullfile(homedir,'reaction_median.mat'))
+            
+            median_RT = react(kk);
+            padding_time(1) = 0; %500; %0 %median_RT;
+            padding_time(2) = 300; %0; %300; %median_RT;
+
+            [acc_w,acc_nw,rec_w,rec_nw,y,tab_w_cl,tab_nw_cl,tab_w_ncl,tab_nw_ncl]=acc_rec_count(tab,MS_TEMP,samplingRateData,padding_time);
+            if j < 5
+               Card = Card + y; 
+            else
+               Obli = Obli + y;
+                
+            end
+          
+        end
+
+    
+    end
+    Orignial=zeros(5,2);
+    Switch=zeros(5,2);
+    for k = 1 : 5
+        Orignial(k,:) = Card(k,:)+Card(11-k,:);
+        Switch(k,:)= Obli(k,:)+Obli(11-k,:);
+    end
+    cardinal_cum(:,kk) = Orignial(:,1);
+    oblique_cum(:,kk) = Switch(:,1);
+end
+
+
+
+
+x=[0.7,0.85,1,1.15,1.3,1.7,1.85,2,2.15,2.3];
+xt=[1,2];
+
+Y_total=[cardinal_cum;oblique_cum];
+
+% Oringinal_con = Y_total(1,:) + Y_total(2,:)+ Y_total(3,:)+ Y_total(4,:)+ Y_total(5,:);
+% Switch_con = Y_total(6,:) + Y_total(7,:)+ Y_total(8,:)+ Y_total(9,:)+ Y_total(10,:);
+% [h,p] = ttest(Oringinal_con,Switch_con);
+% output = [Oringinal_con',Switch_con'];
+% writematrix(output,'nu_CvO.csv'); 
+
+
+
+
+figure
+b=bar(x,Y_total,'stacked');
+set(gca,'xaxislocation','top');
+set(gca,'XTick',xt); 
+set(gca,'XTicklabels',{'Cardinal','Oblique'}); 
+axes;
+c=bar(x,Y_total,'stacked');
+set(gca,'XTick',x); 
+set(gca,'XTicklabels',{'8°','4°','2°','1°','0.5°','8°','4°','2°','1°','0.5°'}); 
+color = {[51, 34, 136],[17, 119, 51],[68, 170, 153],[136, 204, 238],[221, 204, 119],[204, 102, 119],[170, 68, 153],[136, 34 85]};
+for sdf = 1 : 8 
+    b(sdf).FaceColor = 'flat';
+    b(sdf).CData = color{sdf}/255;
+    c(sdf).FaceColor = 'flat';
+    c(sdf).CData = color{sdf}/255;
+end
+
+ylabel('# of MS')
+title('All Subject')
+%figpath='C:\Users\86186\Desktop\fig';
+%name = 'C:\Users\86186\Desktop\fig\new\se.png';
+%saveas(gca,name) 
+
+%%
+% omit left out subjects
+Y_total_new = sum(Y_total);
+[~,IND] = find(Y_total_new~=0);
+Y_new = Y_total(:,IND);
+Y_new_cardinal = Y_new(1:5,:)-median(Y_new(1:10,:),1);
+Y_new_oblique = Y_new(6:10,:)-median(Y_new(1:10,:),1);
+
+colornew = color(IND);
+
+figure
+
+yline(0, ':', 'LineWidth', 2)
+hold on
+
+tmpX = [0.5 1 2 4 8]; %1:5;
+cardinalslopes = [];
+for sub = 1 : length(IND) 
+    tmpY = Y_new_cardinal(:,sub);
+    c = polyfit(tmpX,tmpY,1);
+    y_est = polyval(c,tmpX);
+    plot(tmpX,y_est,'Color',colornew{sub}/255,'LineWidth',2)
+    hold on
+    cardinalslopes = [cardinalslopes c(2)];
+end
+
+hold on
+
+for sdf = 1 : length(IND) 
+    scatter1 = scatter(tmpX,Y_new_cardinal(:,sdf),50,'MarkerFaceColor',colornew{sdf}/255,'MarkerEdgeColor',colornew{sdf}/255); 
+    scatter1.MarkerFaceAlpha = .4;
+    scatter1.MarkerEdgeAlpha = .4;
+end
+hold on
+
+tmpX = [9.5 10 12 14 18]; %6:10;
+
+obliqueslopes = [];
+for sub = 1 : length(IND) 
+    tmpY = Y_new_oblique(:,sub);
+    c = polyfit(tmpX,tmpY,1);
+    y_est = polyval(c,tmpX);
+    p2 = plot(tmpX,y_est,'Color',colornew{sub}/255,'LineWidth',2);
+    hold on
+    obliqueslopes = [obliqueslopes c(2)];
+end
+
+% p2 = plot(6:10, Y_new_oblique, 'o');
+% for sdf = 1 : length(IND) 
+%     p2(sdf).MarkerFaceColor = colornew{sdf}/255;
+%     p2(sdf).Color = colornew{sdf}/255;
+% end
+
+for sdf = 1 : length(IND) 
+    scatter2 = scatter(tmpX,Y_new_oblique(:,sdf),50,'MarkerFaceColor',colornew{sdf}/255,'MarkerEdgeColor',colornew{sdf}/255); 
+    scatter2.MarkerFaceAlpha = .4;
+    scatter2.MarkerEdgeAlpha = .4;
+end
+
+ax = gca;
+ax.XLim = [0 19];
+ax.YLim = [-120 120];
+
+%% PLOT AGAIN BUT COMBINING CARDINAL vs OBLIQUE
+
+% omit left out subject
+Y_total_new = sum(Y_total);
+[~,IND] = find(Y_total_new~=0);
+Y_new = Y_total(:,IND);
+Y_new_all = Y_new(1:10,:)-median(Y_new(1:10,:),1);
+Y_new_all = (Y_new_all(1:5,:)+Y_new_all(6:10,:))/2;
+
+colornew = color(IND);
+
+figure
+
+yline(0, ':', 'LineWidth', 2)
+hold on
+
+tmpX = [-8 -4 -2 -1 -.5]; %1:5;
+allslopes = []; y_ests = [];
+for sub = 1 : length(IND) 
+    tmpY = Y_new_all(:,sub);
+    c = polyfit(tmpX,tmpY,1);
+    y_est = polyval(c,tmpX);
+    %plot(tmpX,y_est,'Color','k','LineWidth',2); %colornew{sub}/255
+    p1 = patchline(tmpX,y_est,'edgecolor','k','linewidth',3,'edgealpha',0.3); %colornew{sub}/255
+    hold on
+    allslopes = [allslopes c(2)];
+    y_ests = [y_ests; y_est];
+end
+
+hold on
+
+p1 = patchline(tmpX,median(y_ests),'edgecolor',[0 0 0],'linewidth',4,'edgealpha',1);
+ax = gca;
+ax.XLim = [-8.5 0];
+ax.YLim = [-20 40];
+ax.XTick = [-8 -4 -2 -1 -0.5];
+ax.XTickLabel = {'8' '4' '' '' '0.5'};
+ax.FontSize = 20;
+ax.LineWidth = 2;
+fig1= gcf;
+fig1.Position = [1004 594 298 203];
+%%
+
+%% PLOT AGAIN BUT COMBINING ALL TILTS
+
+% omit left out subject
+Y_total_new = sum(Y_total);
+[~,IND] = find(Y_total_new~=0);
+Y_new = Y_total(:,IND);
+Y_new_all = Y_new(1:10,:)-median(Y_new(1:10,:),1);
+%Y_new_all = (Y_new_all(1:5,:)+Y_new_all(6:10,:))/2;
+Y_new_all = [mean(Y_new_all(1:5,:),1) ; mean(Y_new_all(6:10,:),1) ];
+
+colornew = color(IND);
+
+figure
+
+yline(0, ':', 'LineWidth', 2, 'Color', [.75 .75 .75])
+hold on
+
+sem_card = std(Y_new_all(1,:))/sqrt(length(IND));
+sem_obl = std(Y_new_all(2,:))/sqrt(length(IND));
+
+sem_deff = std(Y_new_all(1,:)-Y_new_all(2,:))/sqrt(length(IND));
+
+% puti method
+r = rectangle('Position',[1-.25  mean(Y_new_all(1,:))-sem_card .5 2*sem_card]);
+r.FaceColor = [[127, 191, 123]/255 .5];
+r.EdgeColor = [[127, 191, 123]/255 .5];
+r.LineWidth = 2;
+hold on
+r = rectangle('Position',[2-.25  mean(Y_new_all(2,:))-sem_obl .5 2*sem_obl]);
+r.FaceColor = [[175, 141, 195]/255 .5];
+r.EdgeColor = [[175, 141, 195]/255 .5];
+r.LineWidth = 2;
+%
+
+hold on
+
+% for significance
+% for stim: 1.3
+r = rectangle('Position',[1 75 1 0], 'FaceColor', [.5 .5 .5], 'EdgeColor', [.5 .5 .5]) % max(max(Y_new_all))*1.6
+r.LineWidth = 2;
+hold on
+% for stim 1.4
+p1 = plot(1.5, 85, '*', 'Color', [.5 .5 .5]); % max(max(Y_new_all))*1.9
+p1.MarkerSize = 7
+
+hold on
+
+condColors = {[127, 191, 123]/255; [175, 141, 195]/255};
+tmpX = 1:2;
+allslopes = []; y_ests = [];
+for ci=1:2
+    x = ci;
+    colorcurr = condColors{ci};
+    for sub = 1 : length(IND) 
+        tmpY = Y_new_all(ci,sub);
+    %     c = polyfit(tmpX,tmpY,1);
+    %     y_est = polyval(c,tmpX);
+    %     %plot(tmpX,y_est,'Color','k','LineWidth',2); %colornew{sub}/255
+    %     p1 = patchline(tmpX,y_est,'edgecolor',[0 0 0],'linewidth',2,'edgealpha',0.3);
+    %     hold on
+    %     allslopes = [allslopes c(2)];
+    %     y_ests = [y_ests; y_est];
+        scatter3 = scatter(x+randn(1)/26, tmpY, 60); %, 'Color', colornew{sub}/255)
+        scatter3.MarkerFaceColor = colorcurr; %colornew{sub}/255;
+        scatter3.MarkerEdgeColor = [1 1 1]; colorcurr; %colornew{sub}/255;
+        scatter3.MarkerFaceAlpha = 1; %0.3;
+        scatter3.MarkerEdgeAlpha = 1; %0.3;
+        scatter3.SizeData = 100;
+        scatter3.LineWidth = 2;
+        hold on
+    end
+end
+
+% FOR PLOTTING THE MEAN
+% hold on
+% errorbar(1, mean(Y_new_all(1,:)), sem_card, 'CapSize',0, 'LineWidth',4, 'Color', [127, 191, 123]/255)
+% hold on
+% pp1 = scatter(1, mean(Y_new_all(1,:)), 'o');
+% pp1.SizeData = 150;
+% pp1.LineWidth = 2;
+% pp1.MarkerFaceColor = condColors{1};
+% pp1.MarkerEdgeColor = [1 1 1];
+% hold on
+% errorbar(2, mean(Y_new_all(2,:)), sem_obl, 'CapSize',0, 'LineWidth',4, 'Color', [175, 141, 195]/255)
+% hold on
+% pp2 = scatter(2, mean(Y_new_all(2,:)), 'o');
+% hold on
+% pp2.MarkerFaceColor = condColors{2};
+% pp2.MarkerEdgeColor = [1 1 1];
+% pp2.SizeData = 150;
+% pp2.LineWidth = 2;
+hold on
+errorbar(1.5, mean(Y_new_all(1,:)), sem_deff,'LineWidth',2, 'Color',[.5 .5 .5]);
+hold on
+
+%p1 = patchline(tmpX,mean(y_ests),'edgecolor',[0 0 0],'linewidth',3,'edgealpha',1);
+ax = gca;
+ax.XLim = [0 3];
+ax.YLim = [-75 90];
+xlim([.5 2.5])
+ax.XTickLabel = {};
+ax.XTick = [1,2];
+ax.YTick = [-60 -30 0 30 60 90];
+ax.YTickLabel = {-60 '' 0 '' 60 ''};
+ax.FontSize = 20;
+ax.LineWidth = 2.5;
+fig1 = gcf;
+fig1.Position = [1004 594 402 203];
+ 
+%%
+% ONE TAILED T-TEST (multiply by 2 to make 1 tailed)
+% TILT ANGLE
+n = length(IND);
+disp('pval for interaction between cardinal and oblique tilt slopes')
+interac = ttest(cardinalslopes,obliqueslopes);
+[a_rej,b_pval,c_ci,d_struc] = ttest(cardinalslopes,obliqueslopes);
+disp('pval for cardinal tilt slopes')
+card_sem = std(cardinalslopes)/sqrt(n);
+card_tstat = mean(cardinalslopes)/card_sem;
+p_card = (1-tcdf(card_tstat,n-1)) % *2 (for 2-tailed)
+disp('pval for oblique tilt slopes')
+obl_sem = std(obliqueslopes)/sqrt(n);
+obl_tstat = mean(obliqueslopes)/obl_sem;
+p_oblique = (1-tcdf(obl_tstat,n-1)) % *2
+
+% TILT ANGLE
+bothslopes = (cardinalslopes+obliqueslopes)/2;
+both_sem = std(bothslopes)/sqrt(n);
+both_tstat = mean(bothslopes)/both_sem;
+p_both = (1-tcdf(both_tstat,n-1)); % *2
+
+% CARDINAL vs OBLIQUE
+[a,b,c,d] = ttest(mean(Y_new_cardinal),mean(Y_new_oblique), 'tail', 'right');
+
+%%
+
+statTable = array2table(Y_new');
+%statTable.StandardDir = [1 1 1 1 1 0 0 0 0 0]';
+%statTable.Tilt = [8 4 2 1 .5 8 4 2 1 .5]';
+%statTable.Properties.VariableNames = ["numMS","StandardDir", "Tilt"];
+
+mdl = fitlm(statTable,'interactions','ResponseVar','numMS',...
+    'PredictorVars',{'StandardDir','Tilt'},...
+    'CategoricalVar',{'StandardDir'});
+
+
+
+% 
+
+% Y_t=Y_con1+Y_con2+Y_con3+Y_con4;
+% 
+% Y_t_plus = zeros(5,2);
+% for ll = 1 : 5 
+%     Y_t_plus(ll,:) = Y_t(ll,:)+ Y_t(11-ll,:);
+% end
+
+%% plot figure for 10
+% figure
+% X = categorical({'-8','-4','-2','-1','-0.5','0.5','1','2','4','8'});
+% X = reordercats(X,{'-8','-4','-2','-1','-0.5','0.5','1','2','4','8'});
+% %y_ax= round(Y(:,1)/(Y(1,1)+Y(1,2)) * 10000)/100 ;
+% bar(X,Y)
+% 
+% title('% of trials with MS during stimulus interval')
+% xlabel('tilt angle')
+% ylabel('# of trials')
+
+% figure
+% X = categorical({'8','4','2','1','0.5'});
+% X = reordercats(X,{'8','4','2','1','0.5'});
+% %y_ax= round(Y(:,1)/(Y(1,1)+Y(1,2)) * 10000)/100 ;
+% bar(X,Y_t_plus(:,1))
+% 
+% title('% of trials with MS during stimulus interval ([0,50])')
+% xlabel('tilt angle')
+% ylabel('# of trials')
+
+%%
+
+% trying dec 12 (anova) 
+subjectlist = [ones(1,10), 2*ones(1,10), 3*ones(1,10), 4*ones(1,10), ... 
+    5*ones(1,10), 6*ones(1,10), 7*ones(1,10)]';
+
+tiltanglelist = repmat([.5, 1, 2, 4, 8, .5, 1, 2, 4, 8], 1,7,1)';
+motiondirlist = repmat([0 0 0 0 0 1 1 1 1 1], 1,7,1)';
+reordered_data = [];
+for si=[1,2,3,4,6,7,8]
+    reordered_data = [reordered_data; [cardinal_cum(:,si); oblique_cum(:,si)]];
+end
+
+tableM = table(subjectlist, tiltanglelist, motiondirlist, reordered_data);
+rm =fitrm(tableM, 'reordered_data~tiltanglelist*motiondirlist', 'WithinDesign', [1,2]);
+ranovaResults = ranova(rm);
+disp(ranovaResults)
+
+
+
+
+
