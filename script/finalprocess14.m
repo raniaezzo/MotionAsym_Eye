@@ -21,31 +21,19 @@ for kk = 1 : 8
     if kk == 5         %|| kk == 7
         continue
     end
-%     
-%     Y_con1 = 0 ; 
-%     Y_con2 = 0 ; 
-%     Y_con3 = 0 ; 
-%     Y_con4 = 0 ; 
-%     Orig = zeros(10,2);
-%     Swit = zeros(10,2);
+
     Card = zeros(10,2);
     Obli = zeros(10,2);
     tab_total = [] ;
     MS_total = [] ; 
     sample=[];
-%     ACC_W=[];
-%     ACC_NW=[];
-%     REC_W=[];
-%     REC_NW=[];
+
     ACC_W=zeros(4,4);
     ACC_NW=zeros(4,4);
     REC_W=zeros(4,4);
     REC_NW=zeros(4,4);
     Y=zeros(10,2);
-    % Tab_w_cl=[];
-    % Tab_nw_cl=[];
-    % Tab_w_ncl=[];
-    % Tab_nw_ncl=[];
+
     D_w=zeros(4,4);
     D_nw=zeros(4,4);
    %calculate numbers of different condition
@@ -75,23 +63,18 @@ for kk = 1 : 8
             samplingRateData=findSamplingRate(msg_filepath);
             sample=[sample,samplingRateData];
             MATpath = fullfile(main_folder, 'eyedata','MATs');
-    %         cd(fullfile(main_folder, 'eyedata','MATs'));
-    %         ms_name = dir(sprintf('%s.mat', direction{j})).name;
+
             ms_path= fullfile(MATpath,sprintf('%s.mat', direction_name{j}) );
             load(ms_path);
-    %         MS_TEMP(:,10)=MS_TEMP(:,10)+ ((i-1)*8 + (j-1))*800;   
-    %         MS_total=[MS_total;MS_TEMP];
-    %         MATpath = fullfile(main_folder, 'eyedata','MATs');
+
             tab_path = fullfile(MATpath, replace(edf_name, '.edf', '_tab_new_outside_blink.mat'));
             load(tab_path)
-    %         tab(:,1)=tab(:,1)+ ((i-1)*8 + (j-1))*800;  
-    %         tab_total=[tab_total;tab]
-    
-            % just added 5-14-2023
-            load(fullfile(homedir,'reaction_median.mat'))
+
+            % added 5-14-2023
+            load(fullfile(homedir,'Derivatives','reaction_median.mat'))
             
             median_RT = react(kk);
-            padding_time(1) = 0; %500; %0 %median_RT;
+            padding_time(1) = 500; %500; %0 %median_RT;
             padding_time(2) = 300; %0; %300; %median_RT;
 
             [acc_w,acc_nw,rec_w,rec_nw,y,tab_w_cl,tab_nw_cl,tab_w_ncl,tab_nw_ncl]=acc_rec_count(tab,MS_TEMP,samplingRateData,padding_time);
@@ -112,12 +95,10 @@ for kk = 1 : 8
         Orignial(k,:) = Card(k,:)+Card(11-k,:);
         Switch(k,:)= Obli(k,:)+Obli(11-k,:);
     end
-    cardinal_cum(:,kk) = Orignial(:,1);
-    oblique_cum(:,kk) = Switch(:,1);
+    cardinal_cum(:,kk) = Orignial(:,1)./(Orignial(:,1)+Orignial(:,2)); %Orignial(:,1);
+    oblique_cum(:,kk) = Switch(:,1)./(Switch(:,1)+Switch(:,2)); % Switch(:,1) (just count)
 end
-
-
-
+%%
 
 x=[0.7,0.85,1,1.15,1.3,1.7,1.85,2,2.15,2.3];
 xt=[1,2];
@@ -131,8 +112,10 @@ Y_total=[cardinal_cum;oblique_cum];
 % writematrix(output,'nu_CvO.csv'); 
 
 
-
-
+% Y_total is the total count across entire experiment for each
+% condition/subject
+% Y_total: rows [card_8; card_4; card_2; card_1; card_0.5; obl_8 etc..]
+% Y_total: columns [subj1, subj2, subj3, etc.]
 figure
 b=bar(x,Y_total,'stacked');
 set(gca,'xaxislocation','top');
@@ -150,7 +133,7 @@ for sdf = 1 : 8
     c(sdf).CData = color{sdf}/255;
 end
 
-ylabel('# of MS')
+ylabel('Percent of trials w/ MS')
 title('All Subject')
 %figpath='C:\Users\86186\Desktop\fig';
 %name = 'C:\Users\86186\Desktop\fig\new\se.png';
