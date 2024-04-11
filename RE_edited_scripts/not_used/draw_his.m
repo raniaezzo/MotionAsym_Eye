@@ -1,8 +1,7 @@
 %histogram figure
-function draw_his(ms_new,filepath)
+function draw_his(ms_new,filepath, direcName)
 %bound=-157.5:45:157.5;
 sum_num=length(ms_new(:,13));
-[path,filename, ~] = fileparts(filepath);
 edge=0.125:0.25:2.125;
 edge=edge-1;
 edge1=edge*pi;
@@ -24,5 +23,5 @@ subplot(1,2,2)
 polarhistogram(deg2rad(ms_new(:,13)),deg2rad([-22.5 22.5 67.5 112.5 157.5 202.5 247.5 292.5 337.49999])),
 title('amplitude')
 
-savefig(a,sprintf('%s/%s_figure3.fig',path,filename))
+savefig(a,sprintf('%s/%s_figure3.fig',filepath,direcName))
 end
