@@ -131,13 +131,21 @@ function [path1,path2,path3,path4,samplingRateData]=convert(filename1,filename2,
     for t = 1:size(tab,1)
     
         currTStart = tab(t,2);
-        currTEnd = tab(t,8);
-        
+
+        % changed this to extract data from trial n start to trial n+1
+        % start
+        %currTEndLong = tab(t,8);
+        if t<size(tab,1) % if not the last trial
+            currTEndLong = tab(t+1,2); % continue logging data until the start of the next trial
+        elseif t == size(tab,1) % if the last trial
+            currTEndLong = dat(end,1);
+        end
+
         currGStart = currTStart+stimulusON;
         currGEnd = currGStart+stimuluslength;
         
-        
-        currDat = dat(dat(:,1)>=currTStart & dat(:,1)<=currTEnd,:);
+        currDat = dat(dat(:,1)>=currTStart & dat(:,1)<currTEndLong,:);
+        %currDat = dat(dat(:,1)>=currTStart & dat(:,1)<=currTEndLong,:);
         
         currDat_stim = dat(dat(:,1)>=currGStart & dat(:,1)<=currGEnd,:);
     

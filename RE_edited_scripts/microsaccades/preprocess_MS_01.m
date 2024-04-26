@@ -5,13 +5,13 @@ cd('/Users/rje257/Documents/GitHub/MotionAsym_Eye/RE_edited_scripts/')
 
 warning('off', 'MATLAB:interp1:NaNstrip');
 warning('off', 'MATLAB:MKDIR:DirectoryExists');
-% Convert EDF and Preprocess eyedata 
+% Convert EDF and Preprocess eyed
 % Read JSON file from parent directory for paths and params
 jsonparamfile = 'setup.json';
 jsonParams = jsondecode(fileread(jsonparamfile));
 datadir = jsonParams.datadir.Path; 
 scriptsdir = jsonParams.scriptsdir.Path;
-edf2asc = jsonParams.edf2ascdir.Path;
+edf2asc = jsonParams.edf2ascdir.Path; %_renamingtotestcodePath;
 
 addpath(genpath(scriptsdir))
 
@@ -23,7 +23,7 @@ direction = {'VU','VL','HL','HR','LL','LR','UL','UR'};
 plotON = 1; % this will create plots for each trial iteratively on the same figure handle.
 
 % set a predetermined temporal length for event matrix
-nSampleCutOff = 4000; %2500;  % this is in ms & samples (data will always be in 1000hz)
+nSampleCutOff = 4500; % this is in ms & samples (data will always be in 1000hz) - allow data to go into next trial for pupil analysis
 
 VFAC=[6,6]; % velocity threshold for X, Y to constitute as a microsaccade
 MINDUR=6; % minimum duration (ms) to constitute as a microsaccade 
@@ -33,9 +33,9 @@ threshold_AM=[.05 1]; %[0.05,1]; % minimum and maximum amplitude (deg) to consti
 %%
 
 tic
-for ii = 2 : 2
-    for jj = 2 : 2 %2 %2 % NOT 1:2 (for S07 / S08)
-        for kk = 1 : 8 %8 %8 %8 %1 : 8 %8
+for ii = 5 : 5
+    for jj = 1 : 1 %2 %2 % NOT 1:2 (for S07 / S08)
+        for kk = 3 : 3 % 1 : 8
 
             % 2 out of 112 eyelink files are corrupted (missing data).
             % Leave them out for the analysis
@@ -55,6 +55,8 @@ for ii = 2 : 2
                 'ProcessedData', condition{jj}, 'eyedata','figures');
             microsaccdata_folder = fullfile(datadir, subject{ii}, ...
                 'ProcessedData', condition{jj}, 'eyedata','microsaccades');
+            rawcomponents_folder = fullfile(datadir, subject{ii}, ...
+                'ProcessedData', condition{jj}, 'eyedata','components');
 
 
             % check for possibility of multiple blocks
@@ -117,7 +119,8 @@ for ii = 2 : 2
                         % updates _tab file with boolean if eye blinked during
                         % stim period
                         add_blink(path_tab,path_blink, samplingRateData);
-                        % updates _dat_all file with boolean if eye blinked 
+                        % updates _dat_all file with boolean if eye blinked
+                        % (does not by itself remove blinks from data)
                         omitblinks(path_dat,path_blink,0,samplingRateData);
                         disp('Complete.')
                     else
@@ -157,7 +160,8 @@ for ii = 2 : 2
                     numBlink=[]; MS=[];
         
                     eventMatrix = nan(nTrials, nSampleCutOff);
-                    eyetraceMatrix = nan(nTrials, nSampleCutOff,2);
+                    eyetraceMatrix = nan(nTrials, nSampleCutOff,2); % x, y
+                    pupilMatrix = nan(nTrials, nSampleCutOff); 
         
                     % these are not used
                     col_dva=nan(size(Dat_all,1),2);
@@ -176,18 +180,33 @@ for ii = 2 : 2
 %                             continue
 %                         end
         
-                        % get Dat for trial i (4-5 cols)
-                        order = tab(i,2) < Dat_all(:,1) & tab(i,8) > Dat_all(:,1);
-                        trial= Dat_all(order,:);
-        
+
                         samplingRateData = msgFileSamplingRateData;
+
+                        % get Dat for trial i (4-5 cols)
+                        if i ~= length(tab)
+                            %order = tab(i,2) < Dat_all(:,1) & tab(i,8) > Dat_all(:,1); % old
+
+                            % limit how much a trial data log goes into the next
+                            % trial. Stop during stimulus onset of next
+                            % trial as the MAX (this will result in minimum of trial n length of 1800 and trial n+1 of 1300 = 3100 not
+                            % accounting for response time)
+                            order = tab(i,2) < Dat_all(:,1) & tab(i+1,2)+(1300/(1000/samplingRateData)) > Dat_all(:,1); % trial n start --> trial n+1 stimulus start
+                        elseif i == length(tab) % last trial
+                            order = tab(i,2) < Dat_all(:,1);
+                        end
+
+                        trial= Dat_all(order,:); % this is raw trial n start to next trial stim on (ms)
         
                         % upsample or downsample in cases of different
                         % sampling rate (e.g., 1000hz vs 2000hz):
                         % this will also change samplingRateData
                         [trial,samplingRateData] = check4interp(trial,samplingRateData);
+
                        
-                        % make labels for each eye trace segment in between blinks
+                        % make labels for each eye trace segment in between
+                        % blinks (add a column to new_trial with segment #
+                        % - between blinks)
                         new_trial=segmentnonBlinks2(trial);
         
 %                         % check for rare eyetracker error (I think I already do
@@ -206,22 +225,37 @@ for ii = 2 : 2
         
                         % fill event matrix (cut off if longer than )
                         temp = new_trial(:,5)';
+                        tempX = new_trial(:,2)';
+                        tempY = new_trial(:,3)';
+                        tempP = new_trial(:,4)';
                         if length(temp) > nSampleCutOff
                             temp = temp(1:nSampleCutOff);
+                            tempX = tempX(1:nSampleCutOff);
+                            tempY = tempY(1:nSampleCutOff);
+                            tempP = tempP(1:nSampleCutOff);
                         end
-                        eventMatrix(i, 1:length(temp)) = ~isnan(temp); % blinks (nan to 0)
-        
+                        eventMatrix(i, 1:length(temp)) = ~isnan(temp); % blinks (nan to 0), everything else 1, nans are outside of dat_all range?
+                        
+                        % each row contains data that has min length of
+                        % trial n duration (1800) + duration of trial n+1 before stimulus (1300) = 3100
+                        % max if set to 4500 for compulational purposes
+                        eyetraceMatrix(i, 1:length(tempX), 1) = tempX; % save out raw X
+                        eyetraceMatrix(i, 1:length(tempY), 2) = tempY; % raw Y
+                        pupilMatrix(i,1:length(tempP)) = tempP; % raw pupil
+
+
                         for j = 1 : size(num_seg,1)
                             ord=k==num_seg(j);
                             o=find(ord);
                             trial_seg=new_trial(ord,:);
-                            if sum(isnan(trial_seg(:,5)))==0
+                            [segLength, ~] = size(trial_seg);
+                            if sum(isnan(trial_seg(:,5)))==0 && segLength > 105
                                 x=dvaPerPx*(trial_seg(:,2)-screenCenter(1));
                                 y=dvaPerPx*(trial_seg(:,3)-screenCenter(2));
                                 if isnan(y(end))
                                     y(end) = y(end-1);
                                 end
-                                if size(x,1) > 105
+
                                     x_fil=filtfilt(fir1(35,0.05),1,x);
                                     y_fil=filtfilt(fir1(35,0.05),1,y);
                     %             col_dva(o,1)=x_fil;
@@ -242,7 +276,7 @@ for ii = 2 : 2
                                         MS=[MS;msac];
                                         MS_fil=filterAM(MS,threshold_AM);
                                     end
-                                end
+
                             end
                     %         col_dva(o,1)=x_fil;
                     %         col_dva(o,2)=y_fil;
@@ -284,7 +318,7 @@ for ii = 2 : 2
                             % overlay all MS for this trial
                             ms2plot = MS_fil(MS_fil(:,10)==i,:);
                             ms2plot = ms2plot(ms2plot(:,2)<=nSampleCutOff,:); % remove MS outside of 2500 range
-                            checkQuality(screenCenter, dvaPerPx, new_trial, ms2plot, i, tab)
+                            %checkQuality(screenCenter, dvaPerPx, new_trial, ms2plot, i, tab)
                         end
                         
                     end 
@@ -302,6 +336,7 @@ for ii = 2 : 2
         
                     mkdir(figures_folder)
                     mkdir(microsaccdata_folder)
+                    mkdir(rawcomponents_folder)
         
                     figure
                     imagesc(EVENTS)
@@ -313,7 +348,11 @@ for ii = 2 : 2
                     hold on 
                     xline(1800, 'r')
                     saveas(gca, sprintf('%s/MS_rate_%s%s.png',figures_folder, direction{kk},blocklabel))
-        
+
+                    figure
+                    plot(nanmean(pupilMatrix, 1))
+                    saveas(gca, sprintf('%s/rawMeanPupil_%s%s.png',figures_folder, direction{kk},blocklabel))
+
                     eventFilename = strcat(subject{ii},'_Switched_',direction{kk}, blocklabel, '_events.mat');
                     save(fullfile(microsaccdata_folder,eventFilename), 'EVENTS');
 
@@ -322,6 +361,12 @@ for ii = 2 : 2
         
                     rateFilename = strcat(subject{ii},'_Switched_',direction{kk}, blocklabel, '_rate.mat');
                     save(fullfile(microsaccdata_folder,rateFilename), 'rate');
+
+                    rawdataFilename = strcat(subject{ii},direction{kk}, blocklabel, '_pupilMatrix.mat');
+                    save(fullfile(rawcomponents_folder,rawdataFilename), 'pupilMatrix');
+
+                    rawdataFilename = strcat(subject{ii},direction{kk}, blocklabel, '_eyetraceMatrix.mat');
+                    save(fullfile(rawcomponents_folder,rawdataFilename), 'eyetraceMatrix');
                     
                     
                     %% MS Characteristics

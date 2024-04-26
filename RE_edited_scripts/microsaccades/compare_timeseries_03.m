@@ -1,4 +1,4 @@
-clc; clear all; close all;
+clc; clear all; %close all;
 
 % replace path to wherever json file lives
 cd('/Users/rje257/Documents/GitHub/MotionAsym_Eye/RE_edited_scripts/')
@@ -32,16 +32,20 @@ end
 % calculate the z-score from the timepoints of the first before suppression
 % to first MS after suppression
 
+stimonset = 300; % this data has 1000 ms cutoff from beginning
+stimoffset = 800; 
+
 for ii = 1:1
 
+    figure
     summaryMSPath = fullfile(datadir, subjects{ii}, 'ProcessedData', 'Summary', 'microsaccades');
     fileName = sprintf('%s_%s_%s_%s_%i_%i', subjects{ii}, analysis_type, fieldNames{1}, fieldNames{2}, trialwise, percentileRange);
     summaryName = fullfile(summaryMSPath, fileName);
     load(strcat(summaryName, '.mat'))
 
-    % find the suppression point
+    % find the suppression point (during stimulus)
     combinedData = nanmean([rate.(fieldNames{1}); rate.(fieldNames{2})]);
-    [~,suppressionTime] = min(combinedData(300:800)); % stim on to offset (adds back 300 in the function)
+    [~,suppressionTime] = min(combinedData(stimonset:stimoffset)); % stim on to offset (adds back offset in the function)
 
     % this is for all trials (TO DO: separate by accuracy)
     %[postOnsetMS_cond1, latencyCond1, RT_outputCond1, accuracy_Cond1] = compute_latency(rate, '', suppressionTime, rtTrialwise, trialData);
@@ -49,7 +53,7 @@ for ii = 1:1
     figure(counter);
 
     % all data
-    [postOnsetMS_cond, latencyCond, RT_outputCond, accuracy_Cond] = compute_latency(rate, '', suppressionTime, rtTrialwise, trialData);
+    [postOnsetMS_cond, latencyCond, RT_outputCond, accuracy_Cond, selectedTrials] = compute_latency(rate, '', suppressionTime, rtTrialwise, trialData, stimonset);
 
     subplot(1,2,1)
     postOnsetMS_corr = postOnsetMS_cond(accuracy_Cond == 1);
@@ -67,6 +71,9 @@ for ii = 1:1
     plot(RT_outputCond_incorr, postOnsetMS_incorr, '.', 'Color', 'r')
     hold on
 
+    correlation_coefficient1 = corr(RT_outputCond_corr, postOnsetMS_corr', 'type', 'Spearman', 'rows', 'complete')
+    correlation_coefficient2 = corr(RT_outputCond_incorr, postOnsetMS_incorr', 'type', 'Spearman', 'rows', 'complete')
+
     xlim([500 2000])
     xlabel('reaction time (ms)')
     ylabel('onset of first microsaccade (ms)')
@@ -74,11 +81,13 @@ for ii = 1:1
     % global stats to plot probablity density function
     avTotal = mean(latencyCond);
     stdevTotal = std(latencyCond);
+
+    subplot(1,2,1)
     counter = counter+1;
 
     for fi=1:length(fieldnames(rate))
 
-        [postOnsetMS_cond, latencyCond, RT_outputCond, accuracy_Cond] = compute_latency(rate, fieldNames{fi}, suppressionTime, rtTrialwise, trialData);
+        [postOnsetMS_cond, latencyCond, RT_outputCond, accuracy_Cond, qualifyingTrials, dataCheck] = compute_latency(rate, fieldNames{fi}, suppressionTime, rtTrialwise, trialData, stimonset);
         
         figure(counter-1);
         % plot(RT_outputCond1, latencyCond1, '.b')
@@ -288,77 +297,3 @@ data2 = nanmean(rate.oblique,1)*60;
     plot(positive_derivative_indices, 0*ones(length(positive_derivative_indices), 1), 'or')
     [~, timeVal] = find(~isnan(positive_derivative_indices));
     xline(positive_derivative_indices(timeVal(1)), ':')
-
-
-
-
-%%
-
-function [temporal_idx1, latency, RT_output, accuracy_output] = compute_latency(data, fieldname, suppressionTime, rtData, trialData)
-    
-    if ~isstruct(data)
-        error('data must be a struct.')
-    else
-        if isempty(fieldname)
-            names = fieldnames(data);
-        else
-            names = {fieldname};
-        end
-    end
-
-    %[rows, cols] = size(matrix);
-    %filtered_matrix = zeros(rows, cols);
-    temporal_idx1 = [];
-    temporal_idx2 = [];
-    latency = [];
-    leniency = suppressionTime; % allow pre stim onset to leak in
-    RT_output = [];
-    accuracy_output = [];
-
-    for fi=1:length(names)
-
-        matrix = data.(names{fi});
-        [rows, cols] = size(matrix);
-        filtered_matrix = zeros(size(matrix));
-
-        rtMat = rtData.(names{fi});
-        trialMat = trialData.(names{fi});
-
-        selectedTrials = [];
-
-        for i = 1:rows
-            row = matrix(i,:);
-    
-            % first MS after STIM ONSET
-            idx1 = find(row(300+leniency:end) == 1, 1);
-            idx2 = find(row(1:300+leniency) == 1, 1);
-    
-            if ~isempty(idx1) && ~isempty(idx2)
-                filtered_matrix(i, 300+leniency + idx1) = 2; % post stim onset
-                filtered_matrix(i, idx2) = 1; % pre stim onset
-                temporal_idx1 = [temporal_idx1, 300+leniency + idx1];
-                temporal_idx2 = [temporal_idx2, idx2];
-                latency = [latency, (300+leniency + idx1) - idx2];
-                selectedTrials = [selectedTrials i];
-            end
-        end
-
-        RT_output = [RT_output; rtMat(selectedTrials)];
-        accuracy_output = [accuracy_output; trialMat(selectedTrials, 14)];
-   
-    end
-end
-
-function [x_fit, y_fit] = fitLine(RT_outputCond, postOnsetMS_cond)
-
-    % Fit a line to the data
-    valid_indices = ~isnan(RT_outputCond) & ~isnan(postOnsetMS_cond'); % Filter out NaN values
-    x_valid = RT_outputCond(valid_indices);
-    y_valid = postOnsetMS_cond(valid_indices)';
-    
-    % Fit a line to the valid data
-    p = polyfit(x_valid, y_valid, 1);
-    x_fit = linspace(min(x_valid), max(x_valid), 100);
-    y_fit = polyval(p, x_fit);
-
-end

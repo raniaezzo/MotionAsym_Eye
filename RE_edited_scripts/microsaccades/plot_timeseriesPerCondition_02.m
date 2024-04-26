@@ -1,4 +1,4 @@
-clc; clear all; close all;
+clc; clear all; %close all;
 
 % replace path to wherever json file lives
 cd('/Users/rje257/Documents/GitHub/MotionAsym_Eye/RE_edited_scripts/')
@@ -7,7 +7,7 @@ jsonParams = jsondecode(fileread(jsonparamfile));
 subjects = jsonParams.subjects.Subjectids; 
 protocols = jsonParams.protocols.Protocolids; 
 datadir = jsonParams.datadir.Path; 
-nSampleCutOff = 4000; 
+nSampleCutOff = 4000; % or 2500; %
 analysis_type = 'direction'; %'direction'; % 'tilt'; %'location'
 
  % trialwise will take mean over all trials across sessions and bootstrap
@@ -36,7 +36,7 @@ time=[0,100];
 x = (1 : nSampleCutOff) - 1300;
 samplingRateData = 1000; % 1000 hz after running preprocess_MA_01.m
 
-for ii = 1:8
+for ii = 1:1 %8
     figure
 
     summaryMSPath = fullfile(datadir, subjects{ii}, 'ProcessedData', 'Summary', 'microsaccades');
@@ -68,7 +68,7 @@ for ii = 1:8
         rtSummary = struct();
         rtTrialwise = struct();
     
-        for jj = 1 : 2
+        for jj = 1 : 2 %2
             if jj== 1 & ii > 6 
                 continue
             end

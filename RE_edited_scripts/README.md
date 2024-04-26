@@ -26,9 +26,9 @@ RECENT FIXES:
 
 preprocess_MS_01.m
 
-For all subjects, for each motion direction/location, this script will call the  following scripts, then filters the timeseries (MATLAB's filtfilt.m) identifies Microsaccades (scripts below) and create a summary of Microsaccade properties. Inside the loop, multiple MS segments are joined into one matrix (within a trial) and saccades (defined by velocity and amplitude are turned to NaNs). It outputs (_events.mat) and (_rate.mat) files and corresponding .pngs. In the main script 8 files are saved: 
+For all subjects, for each motion direction/location, this script will call the  following scripts, then filters the timeseries (MATLAB's filtfilt.m) identifies Microsaccades (scripts below) and create a summary of Microsaccade properties. Inside the loop, multiple MS segments are joined into one matrix (within a 4500 ms period maxing out at next trial stim start) and saccades (defined by velocity and amplitude are turned to NaNs). It outputs (_events.mat) and (_rate.mat) files and corresponding .pngs. In the main script 8 files are saved: 
 
-	convert.m: will convert EDF file to separate MAT files with timeseries (_DAT_all, _DAT_stim files), and timepoint labels (_tab). The timepoints are defined based on the printed MESSAGES inside the experimental code (e.g, TRIAL_START, TRIAL_END). _DAT_all contains all trial data (TRIAL_START to TRIAL_END per row) and leaves out data in-between. _DAT_stim contains all trial data from (STIM_ON to STIM OFF). It appears like this:
+	convert.m: will convert EDF file to separate MAT files with timeseries (_DAT_all, _DAT_stim files), and timepoint labels (_tab). The timepoints are defined based on the printed MESSAGES inside the experimental code (e.g, TRIAL_START, TRIAL_END). _DAT_all contains all trial data (TRIAL_START to next TRIAL_START per row) and leaves out data in-between. _DAT_stim contains all trial data from (STIM_ON to STIM OFF). It appears like this:
 MSG	2333363 EVENT_ClearScreen
 MSG	2333824 TRIAL_START 573
 MSG	2333484 TRIAL_END
@@ -41,12 +41,12 @@ MSG	2333484 TRIAL_END
 
 	add_outside.m: creates new (_tab) file which includes the boolean column above if any values exceeded the threshold from screen center during stimulus presentation.
 
-	add_blink.m: updates file (_tab) to include a column with 0 or 1 indicating whether a blink occurred during the stimulus period based on Eyelink detection.
+	add_blink.m: updates file (_tab) to include a column with 0 or 1 indicating whether a blink occurred during the stimulus period based on Eyelink detection. THIS IS SPECIFIC TO STIMULUS PERIOD, TO LATER USE AS EXCLUSION CRITERIA.
 
 	findSamplingRate.m: returns the sampling rate according to that EDF/MSG file.
 		NOTE: check that the outside and blink parameters account for any differences in sampling rate.
 
-	omitblinks.m: turns a column with replicated timestamps and turns any blink period to nans. Note that the data is only during trial, so there are more blinks that reflected in the Dat_all_blink.mat files.
+	omitblinks.m: turns the 5th column with replicated timestamps and turns any blink period to nans (to serve as a label). Does not by itself remove blinks from the data, this is done later in the script. THIS ACCOUNTS FOR BLINKS OUTSIDE OF STIMULUS PERIOD.
 
 	segmentnonBlinks2.m: creates separate segments of the eyetrace between blinks. This will make a column in the trial matrix with 1s, 2s, 3s, etc corresponding to each eye trace between blinks.
 
@@ -151,12 +151,40 @@ plot_timeseriesPerCondition_02.m: plot the MS rate per condition per subject as 
 
 compare_timeseries_03.m: plots the latency (defined as the time between last MS and the next relative to stimulus period), and plot them per condition.
 
-	compute_latency() and fit_Line() functions defined within the script.
+	compute_latency() 
+	fit_Line()
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-new_script_for_Dat_all.m: 
+processPupildata_01.m: take all pupil timeseries, centers the signal around the min around stimulus period, filters, and corrects blinks. Then creates allpupilData.mat which contains the filtered pupil data, timestamps, tab, and summary for each trial across the experiment. Also have the MS event data in the same matrix format as allmsData.mat. Then it fits the pupil data (trial wise) and estimates the parameters and saves as allpupilFits.mat.
 
+plot_pupilparams_02.m: plots to check the latency / amplitude per event for each difficulty level.
+
+
+compareLatencies_03.m: computes and pots the the MS onset latencies with respect to RT, pupil, etc.
+
+
+
+
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+~~~ I think below not used anymore? ~~~~
+model_pupilData.m
+	*Used to be new_script_for_Dat_all.m: 
+
+	TO DO:
+		- linearly interpolate blinks
+		- fit denison model on a trial wise basis to estimate parameters for cardinal vs. oblique
+			Include events: (?) trial start?
+					(0) fixation enforcement? (1000 ms)?
+					(1) stimulus on [or MS rebound]: latency and amplitude as free parameters
+				        (2) stimulus_off/response cue (transient luminance change)
+					(3) response time/feedback
+					(4) next trial start
+				- Sessionwise baseline
 
 
 

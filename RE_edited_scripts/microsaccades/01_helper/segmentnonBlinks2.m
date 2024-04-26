@@ -6,8 +6,8 @@ function output=segmentnonBlinks2(trial)
          b=size(trial,1);
          aaa=ones(b,1);
          t=1;
-         for i = 2 : b
-             if a(i)==a(i-1)
+         for i = 2 : b % loop through each sample across trial
+             if a(i)==a(i-1) % boolean column
                  aaa(i)=t;
              else
                  t=t+1;

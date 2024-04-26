@@ -20,6 +20,16 @@ function omitblinks(data_in,blink_path,omit,samplerate)
              time(order)=nan;
              
          end
+
+         % additionally make nans any time outside of stimulus period that
+         % are blinks (-1, -1, 0) - RE added 4-13-24
+         for di=1:length(Dat_all)
+             if Dat_all(di,2:4) == [-1, -1, 0]
+                 time(di) = nan;
+             end
+         end
+
+
          Dat_all=[Dat_all,time];
          %save(sprintf('%s/%s_blink.mat',path,filename),'Dat_all');
          %data_out=sprintf('%s/%s_blink.mat',path,filename);

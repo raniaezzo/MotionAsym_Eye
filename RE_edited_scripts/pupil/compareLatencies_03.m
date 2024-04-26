@@ -1,0 +1,447 @@
+clc; clear all; %close all;
+
+% replace path to wherever json file lives
+cd('/Users/rje257/Documents/GitHub/MotionAsym_Eye/RE_edited_scripts/')
+jsonparamfile = 'setup.json';
+jsonParams = jsondecode(fileread(jsonparamfile));
+subjects = jsonParams.subjects.Subjectids; 
+protocols = jsonParams.protocols.Protocolids; 
+datadir = jsonParams.datadir.Path; 
+
+analysis_type = 'tilt';
+
+stimonset = 1300; % this data has 1000 ms cutoff from beginning
+stimoffset = 1800; 
+
+analyses = {'direction', 'tilt', 'outcome'};
+x_values = linspace(-5, 5, 100);
+z_score_init = 60000; % arbitrary, but never goes beyond
+
+msOnset = nan(length(subjects), 2, length(analyses)); % subjects, easy/hard, analysis
+zscored_msOnset = nan(length(subjects), 2, length(analyses));
+
+
+% Initialize the cell array for probability density
+probDensity = cell(1, length(analyses));
+grand_z_scores_MSonset = cell(1, length(analyses)); 
+grand_possible = cell(1, length(analyses)); 
+for cc = 1:length(analyses)
+    matrix = nan(length(subjects), length(x_values), 2);
+    matrix2 = nan(length(subjects), z_score_init, 2);
+    matrix3 = nan(length(subjects), 1, 2);
+    % Assign the matrix to the cell
+    probDensity{cc} = matrix;
+    grand_z_scores_MSonset{cc} = matrix2; % mat2 is for zscores
+    grand_possible{cc} = matrix3; % mat2 is for zscores
+end
+
+totalQualifiedTrials = nan(length(subjects), length(analyses));
+
+grand_z_scores_MSonset_easy = [];
+grand_z_scores_MSonset_hard = [];
+grand_possible_easy = [];
+grand_possible_hard = [];
+
+
+for si=1:8 %1:length(subjects)
+
+    f1 = figure;
+    subj=subjects{si};
+
+    savePath = sprintf('%s/%s/ProcessedData/Summary/pupil', datadir, subj);
+    load(fullfile(savePath,sprintf('%s_allpupilFits.mat', subj)), 'output');
+    load(fullfile(savePath,sprintf('%s_allpupilData.mat', subj))); % to load in tab file
+
+    rate = load(fullfile(strrep(savePath, 'pupil', 'microsaccades'), sprintf('%s_allmsData.mat', subj)));
+
+%     % get rows that are cardinal / oblique 
+%     easyTrials = ismember(alltab(:,10), 5:8); 
+%     hardTrials = ismember(alltab(:,10), 1:4);
+% 
+%     rate_easy = sum(rate.allMSData(easyTrials,:),1);
+%     rate_hard = sum(rate.allMSData(hardTrials,:),1);
+
+    % find the mean suppression point (during stimulus)
+    %combinedData = nanmean([rate.(fieldNames{1}); rate.(fieldNames{2})]);
+    %[~,suppressionTime] = min(combinedData(300:800)); % stim on to offset (adds back 300 in the function)
+
+%     meanMS = nanmean(rate.allMSData,1);
+%     [~,suppressionTime] = min(meanMS(stimonset:stimoffset)); 
+
+    % Correction for some trials with <500 RT: some early sessions counted
+    % ms relative to stimOff rather than stimOn
+    temp = alltab(:,1); % get the trial number
+    next_session = [false; diff(temp) < 0];     % Find the points where the numbers start to decrease
+    indices = cumsum(next_session) + 1;
+    rtTrialwise.allMSData = nan(length(alltab),1);
+    suppressionTimes = nan(length(alltab),1);
+    for sn=1:max(indices)
+        [selectTrials, ~] = find(indices==sn);
+    
+%         % find the suppression for the mean rate over session
+        meanMS = nanmean(rate.allMSData(selectTrials,:),1);
+        [~,suppressionTime] = min(meanMS(stimonset:stimoffset)); 
+        suppressionTimes(selectTrials) = ones(length(selectTrials),1)*suppressionTime; % suppression computed within session (but this doesn't matter)
+
+        RT_unfiltered = alltab(selectTrials,13)*1000; % all RTs, no filter
+        if any(RT_unfiltered<500)
+            rtTrialwise.allMSData(selectTrials) = RT_unfiltered +500;
+        else
+            rtTrialwise.allMSData(selectTrials) = RT_unfiltered;
+        end
+    end
+
+    rtTrialwise.allMSData(rtTrialwise.allMSData>=2000) = nan;
+
+    trialData.allMSData = alltab;
+
+    [postOnsetMS_cond, latencyCond, RT_outputCond, accuracy_Cond, qualifyingTrials, dataCheck] = compute_latency(rate, 'allMSData', suppressionTimes, rtTrialwise, trialData, stimonset);
+
+    postOnsetMS_cond = postOnsetMS_cond; % - 1300; % to give 0 stimonset meaning
+    %postOnsetMS_cond = latencyCond;
+
+    tabnew = qualifyingTrials{1}; % 1 b/c all conditions are in cell 1
+    
+    for ai=1:length(analyses)
+
+        analysis_type = analyses{ai};
+
+        subplot(1,3,ai)
+        % Correalte MS latency with Pupil Latency
+        if strcmp(analysis_type, 'direction')
+            fieldNames = {'cardinal', 'oblique'};
+            color = {[17, 119, 51],[51, 34, 136]}; 
+        elseif strcmp(analysis_type, 'tilt')
+            fieldNames = {'largeoffset','smalloffset'};
+            color = {[0, 0, 0],[175, 175, 175]}; 
+        elseif strcmp(analysis_type, 'location')
+            fieldNames = {'horizontalLoc','verticalLoc'};
+            color = {[0, 0, 0],[175, 175, 175]}; 
+        elseif strcmp(analysis_type, 'dirtilt')
+            fieldNames = {'easycardinal','hardoblique'};
+            color = {[0, 0, 0],[175, 175, 175]}; 
+        elseif strcmp(analysis_type, 'outcome')
+            fieldNames = {'correct','incorrect'};
+            color = {[0, 255, 0],[255, 0, 0]}; 
+        end
+
+
+        if strcmp(analysis_type, 'direction')
+            easyTrials = ismember(tabnew(:,10), 5:8); % & tabnew(:,14)==1; 
+            hardTrials = ismember(tabnew(:,10), 1:4); % & tabnew(:,14)==1;
+            possibleEasy = sum(ismember(trialData.allMSData(:,10), 5:8));
+            possibleHard = sum(ismember(trialData.allMSData(:,10), 1:4));
+        elseif strcmp(analysis_type, 'tilt')
+            easyTrials = tabnew(:,11)>=4; %  & tabnew(:,14)==1;
+            hardTrials = tabnew(:,11)<2; %  & tabnew(:,14)==1;
+            possibleEasy = sum(trialData.allMSData(:,11)>=4);
+            possibleHard = sum(trialData.allMSData(:,11)<2);
+        elseif strcmp(analysis_type, 'outcome')
+            easyTrials = tabnew(:,14)==1;
+            hardTrials = tabnew(:,14)==0;
+            possibleEasy = sum(trialData.allMSData(:,14)==1);
+            possibleHard = sum(trialData.allMSData(:,14)==0);
+        end
+
+        scatter(RT_outputCond(easyTrials), postOnsetMS_cond(easyTrials), 'o', 'filled', 'MarkerFaceColor', color{1}/255, 'MarkerEdgeColor', 'none', 'MarkerFaceAlpha', 0.5)
+        hold on
+        scatter(RT_outputCond(hardTrials), postOnsetMS_cond(hardTrials), 'o', 'filled', 'MarkerFaceColor', color{2}/255, 'MarkerEdgeColor', 'none', 'MarkerFaceAlpha', 0.5)
+        hold on
+        scatter(nanmedian(RT_outputCond(easyTrials)), nanmean(postOnsetMS_cond(easyTrials)), 350, 'o', 'filled', 'MarkerFaceColor', [1 1 1])
+        hold on
+        scatter(nanmedian(RT_outputCond(easyTrials)), nanmean(postOnsetMS_cond(easyTrials)), 350, '+', 'MarkerEdgeColor', color{1}/255, 'LineWidth', 5, 'MarkerFaceAlpha', 0)
+        hold on
+        scatter(nanmedian(RT_outputCond(hardTrials)), nanmean(postOnsetMS_cond(hardTrials)), 350, 'o', 'filled', 'MarkerFaceColor', [1 1 1])
+        hold on
+        scatter(nanmedian(RT_outputCond(hardTrials)), nanmean(postOnsetMS_cond(hardTrials)), 350, '+', 'MarkerEdgeColor', color{2}/255, 'LineWidth', 5, 'MarkerFaceAlpha', 0)
+        xlim([500 2000])
+        xlabel('reaction time (ms)')
+        ylabel('onset of first microsaccade (ms)')
+        title(analysis_type)
+        %ylabel('latency (ms)')
+        % correlation_coefficient1 = corr(RT_outputCond1, latencyCond1', 'type', 'Spearman')
+        correlation_coefficient1 = corr(RT_outputCond(easyTrials), postOnsetMS_cond(easyTrials)', 'type', 'Spearman', 'rows', 'complete')
+        correlation_coefficient2 = corr(RT_outputCond(hardTrials), postOnsetMS_cond(hardTrials)', 'type', 'Spearman', 'rows', 'complete')
+    
+        msOnset(si,1, ai) = nanmean(postOnsetMS_cond(easyTrials));
+        msOnset(si,2, ai) = nanmean(postOnsetMS_cond(hardTrials));
+
+        [x_fit, y_fit] = fitLine(RT_outputCond(easyTrials), postOnsetMS_cond(easyTrials)-1300);
+        plot(x_fit, y_fit, '-', 'LineWidth', 2, 'Color', color{1}/255);
+    
+        hold on
+        [x_fit2, y_fit2] = fitLine(RT_outputCond(hardTrials), postOnsetMS_cond(hardTrials)-1300);
+        plot(x_fit2, y_fit2, '-', 'LineWidth', 2, 'Color', color{2}/255);
+
+        text(1800, 1200, num2str(correlation_coefficient1)); % Coordinates for the first line of text (2, 5)
+        text(1800, 1100, num2str(correlation_coefficient2)); 
+
+        % take the z-score to allow for combinging data across subjects
+        %z_scores_RT = zscore(RT_outputCond);
+
+        avTotal = mean(postOnsetMS_cond);
+        stdevTotal = std(postOnsetMS_cond);
+        %z_scored_data = (postOnsetMS_cond - avTotal) / stdevTotal;
+        z_scored_data = (postOnsetMS_cond-1800); % / stdevTotal) * -1; % multiply by -1 to make negative interpretation as "early time"
+
+        z_scores_MSonset_easy = z_scored_data(easyTrials);
+        z_scores_MSonset_hard = z_scored_data(hardTrials);
+
+        grand_z_scores_MSonset{ai}(si,1:length(z_scores_MSonset_easy),1) = z_scores_MSonset_easy;
+        grand_z_scores_MSonset{ai}(si,1:length(z_scores_MSonset_hard),2) =  z_scores_MSonset_hard;
+        grand_possible{ai}(si,1:length(possibleEasy),1) =  possibleEasy;
+        grand_possible{ai}(si,1:length(possibleHard),2) =  possibleHard;
+
+%         z_scores_MSonset_easy = zscore(postOnsetMS_cond(easyTrials));
+%         z_scores_MSonset_hard = zscore(postOnsetMS_cond(hardTrials));
+
+        zscored_msOnset(si,1, ai) = nanmedian(z_scores_MSonset_easy);
+        zscored_msOnset(si,2, ai) = nanmedian(z_scores_MSonset_hard);
+
+%         figure(2)
+%         scatter(ones(length(z_scores_RT(easyTrials)),1), z_scores_RT(easyTrials))
+%         hold on
+%         scatter(2*ones(length(z_scores_RT(hardTrials)),1), z_scores_RT(hardTrials))
+%         hold on
+%         scatter(1, median(z_scores_RT(easyTrials)), 150)
+%         hold on
+%         scatter(2, median(z_scores_RT(hardTrials)), 150)
+%         hold off
+
+        [fnorm_easy, ~] = ksdensity(z_scores_MSonset_easy, x_values, 'function','cdf');
+        [fnorm_hard, xinorm] = ksdensity(z_scores_MSonset_hard, x_values, 'function','cdf');
+
+        %total_density_sum = sum(fnorm_easy) + sum(fnorm_hard); %% this makes each probability relative to total events
+        f1_normalized = fnorm_easy * (numel(z_scores_MSonset_easy)/possibleEasy);
+        f2_normalized = fnorm_hard * (numel(z_scores_MSonset_hard)/possibleHard);
+
+        probDensity{ai}(si,1:length(x_values),1) = f1_normalized; 
+        probDensity{ai}(si,1:length(x_values),2) = f2_normalized;
+
+        totalQualifiedTrials(si, ai) = length(postOnsetMS_cond(easyTrials))+length(postOnsetMS_cond(hardTrials));
+
+    end
+
+    sgtitle(subj)
+    f1.Position = [1282 335 1184 742];
+end
+
+
+%% Flatten grant array for easy/hard
+
+figure
+
+for ai=1:length(analyses)
+
+    analysis_type = analyses{ai};
+
+    if strcmp(analysis_type, 'direction')
+        fieldNames = {'cardinal', 'oblique'};
+        color = {[17, 119, 51],[51, 34, 136]}; 
+    elseif strcmp(analysis_type, 'tilt')
+        fieldNames = {'largeoffset','smalloffset'};
+        color = {[0, 0, 0],[175, 175, 175]}; 
+    elseif strcmp(analysis_type, 'location')
+        fieldNames = {'horizontalLoc','verticalLoc'};
+        color = {[0, 0, 0],[175, 175, 175]}; 
+    elseif strcmp(analysis_type, 'dirtilt')
+        fieldNames = {'easycardinal','hardoblique'};
+        color = {[0, 0, 0],[175, 175, 175]}; 
+    elseif strcmp(analysis_type, 'outcome')
+        fieldNames = {'correct','incorrect'};
+        color = {[0, 255, 0],[255, 0, 0]}; 
+    end
+
+    easy_flat = grand_z_scores_MSonset{ai}(:,:,1);
+    hard_flat = grand_z_scores_MSonset{ai}(:,:,2);
+    
+    easy_flat = easy_flat(:); easy_flat = easy_flat(~isnan(easy_flat));
+    hard_flat = hard_flat(:); hard_flat = hard_flat(~isnan(hard_flat));
+    
+    possibleEasy = sum(grand_possible{ai}(:,:,1));
+    possibleHard = sum(grand_possible{ai}(:,:,2));
+    
+    % randomly draw the # of values in each array with replacement
+    % fit a kdensity function 1000 times
+    x_values = linspace(-500, 500, 100); %linspace(-5, 5, 100);
+    numBootstraps = 500;
+    btSamples_easy = nan(numBootstraps, numel(x_values));
+    btSamples_hard = nan(numBootstraps, numel(x_values));
+    
+    for bi=1:numBootstraps
+    
+        if bi==1
+            % mean values (only compute once)
+            [fnorm_easy, ~] = ksdensity(easy_flat, x_values, 'function','cdf');
+            [fnorm_hard, xinorm] = ksdensity(hard_flat, x_values, 'function','cdf');
+            
+             f1_normalized = fnorm_easy * (numel(easy_flat)/possibleEasy);
+             f2_normalized = fnorm_hard * (numel(hard_flat)/possibleHard);
+        end
+    
+        % bootstrap
+        easy_flat_bt = datasample(easy_flat, numel(easy_flat), 'Replace', true);
+        hard_flat_bt = datasample(hard_flat, numel(hard_flat), 'Replace', true);
+        
+        [fnorm_easy, ~] = ksdensity(easy_flat_bt, x_values, 'function','cdf');
+        [fnorm_hard, xinorm] = ksdensity(hard_flat_bt, x_values, 'function','cdf');
+        
+         %f1_normalized 
+         btSamples_easy(bi,1:numel(x_values)) = fnorm_easy * (numel(easy_flat_bt)/possibleEasy);
+         %f2_normalized
+         btSamples_hard(bi,1:numel(x_values)) = fnorm_hard * (numel(hard_flat_bt)/possibleHard);
+    
+    end
+    
+    % Compute the lower and upper percentiles for the 68% confidence interval
+    lbd_easy = prctile(btSamples_easy, 2.5,1); %16, 1);
+    ubd_easy = prctile(btSamples_easy, 97.5,1); %84, 1);
+    lbd_hard = prctile(btSamples_hard, 2.5,1); %16, 1);
+    ubd_hard = prctile(btSamples_hard, 97.5,1); %84, 1);
+    
+     subplot(1,3,ai)
+     plot(xinorm, f1_normalized, 'Color', color{1}/255, 'LineWidth',1); % Plot the KDE
+     hold on
+     %errorbar(xinorm, f1_normalized, f1_normalized - lbd_easy, ubd_easy - f1_normalized, 'b', 'LineWidth', 1.5, 'LineStyle', 'none');
+     %hold on
+     shadedErrorBar(xinorm, f1_normalized, [ubd_easy-f1_normalized; f1_normalized-lbd_easy], 'lineprops', {'-','Color',color{1}/255},'transparent',1,'patchSaturation',0.1);
+     hold on
+     plot(xinorm, f2_normalized, 'Color', color{2}/255, 'LineWidth',1); % Plot the KDE
+     hold on
+     %errorbar(xinorm, f2_normalized, f2_normalized - lbd_hard, ubd_hard - f2_normalized, 'b', 'LineWidth', 1.5, 'LineStyle', 'none');
+     %hold on
+     shadedErrorBar(xinorm, f2_normalized, [ubd_hard-f2_normalized; f2_normalized-lbd_hard], 'lineprops', {'-','Color',color{2}/255},'transparent',1,'patchSaturation',0.2);
+     hold on
+     title(analyses{ai})
+     %xlim([-3 3])
+end
+
+%% raw data
+
+figure
+subplot(1,2,1)
+scatter(ones(length(msOnset(:,1,1))), msOnset(:,1,1), 'g')
+hold on
+scatter(2*ones(length(msOnset(:,2,1))), msOnset(:,2,1), 'r')
+hold on
+plot([msOnset(:,1,1), msOnset(:,2,1)]')
+xlim([0 3])
+subplot(1,2,2)
+scatter(ones(length(msOnset(:,1,2))), msOnset(:,1,2), 'g')
+hold on
+scatter(2*ones(length(msOnset(:,2,2))), msOnset(:,2,2), 'r')
+hold on
+plot([msOnset(:,1,2), msOnset(:,2,2)]')
+xlim([0 3])
+
+%% Difference plot
+
+figure
+title('Difference')
+scatter(ones(length(msOnset(:,1,2))), msOnset(:,2,1) - msOnset(:,1,1), 'g')
+hold on
+scatter(2*ones(length(msOnset(:,2,2))), msOnset(:,2,2) - msOnset(:,1,2), 'r')
+xlim([0 3])
+
+%% z-scored data (multiply by *1 to make z-score - "early values"
+% should not do this for duration
+
+switchSign = 1; % fixed above now
+
+figure
+subplot(1,2,1)
+scatter(ones(length(zscored_msOnset(:,1,1))), switchSign*zscored_msOnset(:,1,1), 'g')
+hold on
+scatter(2*ones(length(zscored_msOnset(:,2,1))), switchSign*zscored_msOnset(:,2,1), 'r')
+hold on
+plot([switchSign*zscored_msOnset(:,1,1), switchSign*zscored_msOnset(:,2,1)]', 'k')
+xlim([0 3])
+subplot(1,2,2)
+scatter(ones(length(zscored_msOnset(:,1,2))), switchSign*zscored_msOnset(:,1,2), 'g')
+hold on
+scatter(2*ones(length(zscored_msOnset(:,2,2))), switchSign*zscored_msOnset(:,2,2), 'r')
+hold on
+plot([switchSign*zscored_msOnset(:,1,2), switchSign*zscored_msOnset(:,2,2)]', 'k')
+xlim([0 3])
+
+%%
+
+figure
+
+for ai=1:length(analyses)
+
+
+    analysis_type = analyses{ai};
+
+    % Correalte MS latency with Pupil Latency
+    if strcmp(analysis_type, 'direction')
+        fieldNames = {'cardinal', 'oblique'};
+        color = {[17, 119, 51],[51, 34, 136]}; 
+    elseif strcmp(analysis_type, 'tilt')
+        fieldNames = {'largeoffset','smalloffset'};
+        color = {[0, 0, 0],[175, 175, 175]}; 
+    elseif strcmp(analysis_type, 'location')
+        fieldNames = {'horizontalLoc','verticalLoc'};
+        color = {[0, 0, 0],[175, 175, 175]}; 
+    elseif strcmp(analysis_type, 'dirtilt')
+        fieldNames = {'easycardinal','hardoblique'};
+        color = {[0, 0, 0],[175, 175, 175]}; 
+    elseif strcmp(analysis_type, 'outcome')
+        fieldNames = {'correct','incorrect'};
+        color = {[0, 255, 0],[255, 0, 0]}; 
+    end
+
+
+    currDensity_easy = probDensity{ai}(:,:,1);
+    currDensity_hard = probDensity{ai}(:,:,2);
+
+%     if switchSign == -1
+%         currDensity_easy = fliplr(currDensity_easy);
+%         currDensity_hard = fliplr(currDensity_hard);
+%     end
+    
+    
+    grandTotalTrials = sum(totalQualifiedTrials(ai,1));
+    
+    subjectWeights = totalQualifiedTrials(:,1)./grandTotalTrials;
+    subjectWeights = [1; 0; 0; 0; 0; 0 ; 0; 0];
+
+    % adjust probability density to reflect weighted probability (so I am not
+    % placing too much weight on subjects with very few trials)
+    currDensity_easy = currDensity_easy.*subjectWeights;
+    currDensity_hard = currDensity_hard.*subjectWeights;
+
+    subplot(1,3,ai)
+    
+    % weighted mean
+    easyDensitySeries = sum(currDensity_easy,1); %/(sum(mean(currDensity_easy,1))+sum(mean(currDensity_hard,1)));
+    hardDensitySeries = sum(currDensity_hard,1); %/(sum(mean(currDensity_hard,1))+sum(mean(currDensity_easy,1)));
+
+    % Calculate the standard error of the weighted mean (SEWM)
+    numerator = sum(subjectWeights .* (currDensity_easy - easyDensitySeries).^2);
+    denominator = (sum(subjectWeights))^2;
+    sewm_easy = sqrt(numerator / denominator);
+    numerator = sum(subjectWeights .* (currDensity_hard - hardDensitySeries).^2);
+    sewm_hard = sqrt(numerator / denominator);
+
+    plot(xinorm, easyDensitySeries, 'Color', color{1}/255, 'LineWidth',2); % Plot the KDE
+    hold on
+    %[~, maxIdx] = max(sum(currDensity_easy,1));
+    %xline(median(sum(currDensity_easy,1)), '--', 'Color', color{1}/255, 'LineWidth',2)
+    %hold on
+    %xline(x_values(maxIdx), 'Color', color{1}/255, 'LineWidth',2)
+    %hold on
+    plot(xinorm, hardDensitySeries, 'Color', color{2}/255, 'LineWidth',2); % Plot the KDE
+    hold on
+    %[~, maxIdx] = max(sum(currDensity_hard,1));
+    %xline(x_values(maxIdx), 'Color', color{2}/255, 'LineWidth',2)
+    %hold on
+    %xline(median(sum(currDensity_hard,1)), '--', 'Color', color{2}/255, 'LineWidth',2)
+    %hold on
+    %errorbar(xinorm, easyDensitySeries, sewm_easy, 'r');
+    xlabel('Time relative to stim offset (std normalized)');
+    ylabel('probability density');
+    title('Kernel Density Estimate');
+    title(analyses{ai})
+    xlim([-3 3])
+end
