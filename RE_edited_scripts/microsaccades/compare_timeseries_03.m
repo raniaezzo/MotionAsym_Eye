@@ -1,4 +1,4 @@
-clc; clear all; %close all;
+%clc; clear all; %close all;
 
 % replace path to wherever json file lives
 cd('/Users/rje257/Documents/GitHub/MotionAsym_Eye/RE_edited_scripts/')
@@ -8,7 +8,7 @@ subjects = jsonParams.subjects.Subjectids;
 protocols = jsonParams.protocols.Protocolids; 
 datadir = jsonParams.datadir.Path; 
 
-analysis_type = 'tilt'; %'direction'; 
+analysis_type = 'direction'; %'direction'; 
 trialwise = 1;
 percentileRange = 68; % for plotting, do 68% CIs
 counter = 1; % for figures
@@ -53,7 +53,8 @@ for ii = 1:1
     figure(counter);
 
     % all data
-    [postOnsetMS_cond, latencyCond, RT_outputCond, accuracy_Cond, selectedTrials] = compute_latency(rate, '', suppressionTime, rtTrialwise, trialData, stimonset);
+    [postOnsetMS_cond, latencyCond, RT_outputCond, accuracy_Cond, selectedTrials, supTimes, postOffsetTimes, selectedTrials] = ...
+        compute_latency(rate, '', suppressionTime, rtTrialwise, trialData, stimonset);
 
     subplot(1,2,1)
     postOnsetMS_corr = postOnsetMS_cond(accuracy_Cond == 1);
@@ -87,7 +88,8 @@ for ii = 1:1
 
     for fi=1:length(fieldnames(rate))
 
-        [postOnsetMS_cond, latencyCond, RT_outputCond, accuracy_Cond, qualifyingTrials, dataCheck] = compute_latency(rate, fieldNames{fi}, suppressionTime, rtTrialwise, trialData, stimonset);
+        [postOnsetMS_cond, latencyCond, RT_outputCond, accuracy_Cond, qualifyingTrials, dataCheck, supTimes, postOffsetTimes, selectedTrials] ...
+            = compute_latency(rate, fieldNames{fi}, suppressionTime, rtTrialwise, trialData, stimonset);
         
         figure(counter-1);
         % plot(RT_outputCond1, latencyCond1, '.b')

@@ -8,6 +8,7 @@ jsonParams = jsondecode(fileread(jsonparamfile));
 subjects = jsonParams.subjects.Subjectids; 
 protocols = jsonParams.protocols.Protocolids; 
 datadir = jsonParams.datadir.Path; 
+datadir = '/Users/rje257/Desktop/MS_Project/Data_DI_wEYE'; % override
 
 %%
 % PUPIL RESPONSE SHOULD BE DEFINED BY ASC PER TRIAL (trial_start to responseTime + 4500 ms)?
@@ -46,6 +47,7 @@ minWindowStart = 1000; minWindowEnd = 1800;
 % this is used to calculate PSC
 baselinePSCstart = 1000; baselinePSCend = 1300;
 
+%%
 for ii = 5 : 5  % CHANGE BACK TO 1:2 if running s04!!
     subj = subjects{ii};
     output = []; % every row is trial eventually all output is saved for this subject
@@ -343,6 +345,7 @@ wnum = 1;
 
 for ii =1:1
     subj = subjects{ii};
+    savePath = sprintf('%s/%s/ProcessedData/Summary/pupil', datadir, subj);
     load(fullfile(savePath,sprintf('%s_allpupilData.mat', subj)));
 
     [nTrials, ~] = size(allfilteredPupilData);
@@ -357,7 +360,7 @@ for ii =1:1
     tic
     
     %parfor trialNum=1:nTrials
-    for trialNum=1:nTrials
+    for trialNum=35 %20 %12 %1:nTrials
     
         if mod(trialNum, 100) == 0
             sprintf('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Trial# %i ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~', trialNum)
@@ -477,8 +480,8 @@ for ii =1:1
     toc
     
     % save it out
-    save(fullfile(savePath,sprintf('%s_allpupilFits.mat', subj)), 'output');
-    delete(gcp); % shut down parallel pool
+    %save(fullfile(savePath,sprintf('%s_allpupilFits.mat', subj)), 'output');
+    %delete(gcp); % shut down parallel pool
 end
 
 %% helpers

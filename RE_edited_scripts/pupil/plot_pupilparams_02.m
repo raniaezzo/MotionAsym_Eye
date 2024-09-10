@@ -14,7 +14,7 @@ event_label = {'pre_stim', 'sti on', 'response'};
 
 %% Plot the amplitude and latency for each event
 
-for si=1:1 %length(subjects)
+for si=3:3 %length(subjects)
     subj=subjects{si};
 
     savePath = sprintf('%s/%s/ProcessedData/Summary/pupil', datadir, subj);

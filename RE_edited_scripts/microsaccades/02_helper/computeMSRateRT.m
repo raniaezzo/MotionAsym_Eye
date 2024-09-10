@@ -38,7 +38,18 @@ timepoint = timepoint(filtered_row_indices, :);
 % these are calculated after filtering tab:
 tabTrials = tab(filtered_row_indices,:);
 
-s_mean = nanmean(timepoint,1)*60;
+% s_mean = nanmean(timepoint,1)*60; % not valid anymore
+
+% this computes the rate accounting for the first timepoint of each MS.
+% smoothes it using a gaussian window (for this see Palmieri, H., Fernández, A., &
+% Carrasco, M. (2023).)
+gausWindowSize = 100; %50;
+
+if ~isempty(timepoint)
+    s_mean = raster2rate(timepoint, gausWindowSize);
+else
+    s_mean = nan(1,nSampleCutOff);
+end
 
 % NOTE: for some early sessions, the experimental code collected 
 % rt without adding stimulus period. To correct this, add 500 to rts from sessions that have

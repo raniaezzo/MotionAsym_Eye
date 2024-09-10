@@ -3,7 +3,7 @@
     "datadir": {
         "LongName": "Data directory",
         "Description": "Directory with the psychophysical and eye data.",
-        "Path": "/Volumes/Vision/UsersShare/Rania/MS_Project/Data_DI_wEYE"
+        "Path": "/Volumes/Vision/UsersShare/Rania/MS_Project/Data_DI_wEYE/"
     },
     "scriptsdir": {
         "LongName": "Scripts directory",
@@ -22,6 +22,10 @@
     "protocols": {
         "LongName": "All possible protocols run on the subjects. Not all subjects were run on both.",
         "Protocolids": ["Full_distance_non_radialtangential","Full_distance_radialtangential"]
+    },
+    "directions": {
+        "LongName": "Abbreviations of each direction, e.g. VU is vertical upper.",
+        "Directionids": ["VU","VL", "HL", "HR", "LL", "LR", "UL", "UR"]
     }
 }
 
