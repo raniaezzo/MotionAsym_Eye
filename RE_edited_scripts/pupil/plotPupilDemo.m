@@ -87,6 +87,7 @@ plot([-15 515], [.5 .5],'-', 'LineWidth', 5, 'Color', [0.3 .3 .3])
 ylabel('event impulses')
 xlabel('time (ms)')
 xlim([-1300 2500])
+xlim([-500 2500])
 a1 = gca;
 a1.XTick = -1000:500:2500; 
 f1 = gcf;
@@ -109,6 +110,7 @@ print(gcf, '-dpdf', fullfile(pathtoSave,'fig3B.pdf'));  % for PDF
 %% load
 
 load('/Volumes/Vision/UsersShare/Rania/MS_Project/S01trial35_examplePupilFit.mat')
+load('/Volumes/Vision/UsersShare/Rania/MS_Project/Data_DI_wEYE/S01/ProcessedData/Summary/pupil/S01_allpupilData.mat')
 figure
 sj = pret_estimate_sj(sj,model,wnum,options);
 xline(800, ':', 'Color', [1 0 0 0.05], 'LineWidth', 3)
@@ -126,7 +128,8 @@ f1.Position = [53 571 795-(795*.21) 285];
 % correction of psc
 yticks = get(gca, 'YTick');
 % Set the Y-tick labels to be divided by 10
-set(gca, 'YTickLabel', yticks / 10);
+yticks = linspace(0,20,5) / (mean(alltrialSignalSummary(:,2))/max(alltrialSignalSummary(:,4)));
+set(gca, 'YTickLabel', yticks * (mean(alltrialSignalSummary(:,2))/max(alltrialSignalSummary(:,4)))); % / 10);
 
 % set(gca, 'FontName', 'Arial', 'FontSize', 20);
 set(gca, 'LineWidth', 1.5);
@@ -138,4 +141,4 @@ set(gcf, 'PaperOrientation', 'landscape');
 set(gcf, 'PaperUnits', 'inches', 'PaperSize', [11.69, 8.27]);
 set(gca, 'FontName', 'Arial', 'FontSize', (285/dpi)*5.6);
 set(gcf, 'PaperPositionMode', 'auto'); 
-print(gcf, '-dpdf', fullfile(pathtoSave,'fig3C.pdf'));  % for PDF
+print(gcf, '-dpdf', fullfile(pathtoSave,'fig3C_new.pdf'));  % for PDF

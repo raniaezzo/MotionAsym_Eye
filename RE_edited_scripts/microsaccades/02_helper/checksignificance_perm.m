@@ -3,7 +3,7 @@ function [sig_cluster,sig_vals] = checksignificance_perm(rateSummary, dependent_
         
         % for permutation testing
         p_threshold = 0.05;
-        num_permutations = 1000; 
+        num_permutations = 256; %1000; 
         two_sided = false;
         num_clusters =[];
 

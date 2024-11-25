@@ -198,7 +198,8 @@ for mm=1:2 % dprime or RT
         %title(sprintf('%s', metric))
         box off
         
-        [h, p, ci, stats] = ttest(performance(:,1), performance(:,2))
+        [h, p, ci, stats] = ttest(performance(:,2), performance(:,1))
+        d = computeCohen_d(performance(:,2), performance(:,1), 'paired')
         
         iter = iter+1;
     end

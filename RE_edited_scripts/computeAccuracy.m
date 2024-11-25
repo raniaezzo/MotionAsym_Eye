@@ -229,6 +229,8 @@ meanSize = 550;
 figure
 hold on
 plot([1 2], [mean(wMScard_large), mean(woMScard_large)], 'k', 'LineWidth', 2)
+[nu, val, ci, stats] = ttest(wMScard_large-woMScard_large)
+d = computeCohen_d(wMScard_large, woMScard_large, 'paired')
 scatter(ones(length(subjects),1)+jittered_vector, wMScard_large, indvSize, 'filled', 'MarkerFaceColor', color{1}/255, 'MarkerEdgeColor', 'k', 'LineWidth', 2.3, 'MarkerFaceAlpha', 0.5)
 hold on
 scatter(1, mean(wMScard_large), meanSize,'filled', 'MarkerFaceColor', color{1}/255, 'MarkerEdgeColor', 'w', 'LineWidth', 2.3)
@@ -238,6 +240,8 @@ hold on
 scatter(2, mean(woMScard_large), meanSize,'filled', 'MarkerFaceColor', color{1}/255, 'MarkerEdgeColor', 'w', 'LineWidth', 2.3)
 hold on
 plot([3 4], [mean(wMScard_small), mean(woMScard_small)], 'k', 'LineWidth', 2)
+[nu, val, ci, stats] = ttest(wMScard_small-woMScard_small)
+d = computeCohen_d(wMScard_small, woMScard_small, 'paired')
 hold on
 scatter(3*ones(length(subjects),1)+jittered_vector, wMScard_small, indvSize, 'filled', 'MarkerFaceColor', [158, 198, 175]/256, 'MarkerEdgeColor', 'k', 'LineWidth', 2.3, 'MarkerFaceAlpha', 0.25)
 hold on
@@ -248,6 +252,8 @@ hold on
 scatter(4, mean(woMScard_small), meanSize,'filled', 'MarkerFaceColor', [158, 198, 175]/256, 'MarkerEdgeColor', 'w', 'LineWidth', 2.3)
 hold on
 plot([5 6], [mean(wMSobli_large), mean(woMSobli_large)], 'k', 'LineWidth', 2)
+[nu, val, ci, stats] = ttest(wMSobli_large-woMSobli_large)
+d = computeCohen_d(wMSobli_large, woMSobli_large, 'paired')
 hold on
 scatter(5*ones(length(subjects),1)+jittered_vector, wMSobli_large, indvSize, 'filled', 'MarkerFaceColor', color{2}/255, 'MarkerEdgeColor', 'k', 'LineWidth', 2.3, 'MarkerFaceAlpha', 0.5)
 hold on
@@ -258,6 +264,8 @@ hold on
 scatter(6, mean(woMSobli_large), meanSize,'filled', 'MarkerFaceColor', color{2}/255, 'MarkerEdgeColor', 'w', 'LineWidth', 2.3)
 hold on
 plot([7 8], [mean(wMSobli_small), mean(woMSobli_small)], 'k', 'LineWidth', 2)
+[nu, val, ci, stats] = ttest(wMSobli_small-woMSobli_small)
+d = computeCohen_d(wMSobli_small, woMSobli_small, 'paired')
 hold on
 scatter(7*ones(length(subjects),1)+jittered_vector, wMSobli_small, indvSize, 'filled', 'MarkerFaceColor', [143, 143, 198]/256, 'MarkerEdgeColor', 'k', 'LineWidth', 2.3, 'MarkerFaceAlpha', 0.25)
 hold on

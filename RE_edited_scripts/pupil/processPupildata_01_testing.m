@@ -48,7 +48,7 @@ minWindowStart = 1000; minWindowEnd = 1800;
 baselinePSCstart = 1000; baselinePSCend = 1300;
 
 %%
-for ii = 4 : 4  % CHANGE BACK TO 1:2 if running s04!!
+for ii = 1 : 1 % CHANGE BACK TO 1:2 if running s04!!
     subj = subjects{ii};
     output = []; % every row is trial eventually all output is saved for this subject
     alltab = {};
@@ -57,10 +57,10 @@ for ii = 4 : 4  % CHANGE BACK TO 1:2 if running s04!!
     alltrialSignalSummary = {};
     allMSData = {};
     counter = 1;
-    for jj = 1 : 2 %2 %2 % NOT 1:2 (for S07 / S08) 
+    for jj = 1 : 2 %2 %2 %2 % NOT 1:2 (for S07 / S08) 
         expcond = protocols{jj};
         sprintf(expcond)
-        for kk = 1 : 8 % 1 : 8
+        for kk = 1 : 8
 
             if ii==3 && jj == 1 && kk == 1
                 continue
@@ -96,6 +96,7 @@ for ii = 4 : 4  % CHANGE BACK TO 1:2 if running s04!!
                 fileName = fileNames{ff}; % direction for that protocol
 
                 load(sprintf('%s/%s/ProcessedData/%s/eyedata/MATs/%s', datadir, subj, expcond, fileName));
+                sprintf('%s/%s/ProcessedData/%s/eyedata/MATs/%s', datadir, subj, expcond, fileName)
                 
                 if length(fileIDs)==1 || ff==1
                     pdata = load(sprintf('%s/%s/ProcessedData/%s/eyedata/components/%s%s_pupilMatrix.mat', datadir, subj, expcond, subj, mdir));
@@ -147,11 +148,11 @@ for ii = 4 : 4  % CHANGE BACK TO 1:2 if running s04!!
                 
                 filteredPupilData = nan(size(data));
                 trialTimeStamps = nan(nTrials,5);
-                trialSignalSummary = nan(nTrials,5);
+                trialSignalSummary = nan(nTrials,4);
     
-                if plotOn
-                    figure;
-                end
+%                 if plotOn
+%                     figure;
+%                 end
                 for di=1:nTrials
                     tempTrial = data(di,:);
                 
@@ -206,6 +207,7 @@ for ii = 4 : 4  % CHANGE BACK TO 1:2 if running s04!!
                     trimmed_array = myBWfilter(trimmed_array,[0.03 , 10],samplingRate,'bandpass');
                 
                     if plotOn
+                        figure(1)
                         plot(trimmed_array)
                         hold on
                         xline(stimStart, 'LineWidth',2)
@@ -222,8 +224,9 @@ for ii = 4 : 4  % CHANGE BACK TO 1:2 if running s04!!
                         hold off
                         xlim([1000 length(trimmed_array)]);
                         title(sprintf('Trial #%i', di))
-                        pause(.3)
-                        hold off
+                        hold on
+                        %pause(.3)
+                        %hold off
                     end
                 
                     % all defined relative to trial start onset
@@ -236,6 +239,9 @@ for ii = 4 : 4  % CHANGE BACK TO 1:2 if running s04!!
                 
                     filteredPupilData(di,1:length(trimmed_array)) = trimmed_array;
                 
+
+
+
     %                 if tab(di,11)<4
     %                     %plot(tempTrial, 'Color',[.5 .5 .5])
     %                     smalltilt = [smalltilt; tempTrial];
@@ -269,52 +275,159 @@ for ii = 4 : 4  % CHANGE BACK TO 1:2 if running s04!!
                 % Calculate the window mean/min and subtract that
                 %meanPupilData = mean(filteredPupilData(:, 1000:1300), 2);
                 %meanPupilData = meanPupilData(:);
-                
+
                 minPupilData = min(filteredPupilData(:, minWindowStart:minWindowEnd), [], 2); % note the [] to specify the dimension
+                %minPupilData = min(filteredPupilData(:, 1000:1300), [], 2);
                 [~, minIndices] = min(minPupilData, [], 2); % Find minimum value and index for each row
                 minTimestamp = minWindowStart+minIndices-1; % log the trialwise min
                 
                 trialTimeStamps = [trialTimeStamps, minTimestamp]; % this is the minimum during stimulus period
                 
+                % THESE LINES BELOW WERE USED BEFORE
                 % PSC: baseline does not take into account the stimulus
                 meanPupilDataAllTime = abs(mean(filteredPupilData(:, baselinePSCstart:baselinePSCend), 2)); % to preserve the sign, take abs (within or across all sessions)?
-                
-                rangePupilDataAllTime = range(filteredPupilData, 2);
 
                 % first center the data so that prestimulus is always aligned (in size);
                 % then divide by overall mean for that time period (within or across
                 % sessions)? This converts to meaningful PSC
-                filteredPupilData = ((filteredPupilData - minPupilData) ./ mean(meanPupilDataAllTime)) * 100; 
+                %filteredPupilData = ((filteredPupilData - minPupilData)); % ./ nanmean(meanPupilDataAllTime) * 100; 
                 
+
+                % just trying
+                %meanPupilDataAllTime = nanmean(filteredPupilData, "all");
+                %filteredPupilData = (filteredPupilData - nanmin(nanmin(filteredPupilData))) ./ (nanmax(nanmax(filteredPupilData)) - nanmin(nanmin(filteredPupilData))) * 100; 
+                %filteredPupilData = (filteredPupilData - meanPupilDataAllTime) ./ meanPupilDataAllTime * 100; 
+                %minPupilData = min(filteredPupilData(:, minWindowStart:minWindowEnd), [], 2);
+                minPupilData = mean(filteredPupilData(:, minWindowStart:minWindowEnd), 2);
+                filteredPupilData = ((filteredPupilData - minPupilData));
+
+                % just added 
+                %filteredPupilData = (filteredPupilData - nanmean(nanmean(filteredPupilData))) ./ nanmean(nanmean(filteredPupilData)) * 100;
+                
+                %disp('MEAN')
+                %nanmean(meanPupilDataAllTime)
+                % THESE LINES ABOVE WERE USED BEFORE
+
+% NEW WAY
+
+                [nTrials,~] = size(filteredPupilData);
+                aa = filteredPupilData; %(:, 1000:1800); %1300);
+                amaxtemp = max(aa'); amax = max(amaxtemp);
+                amintemp = min(aa'); amin = min(amintemp);
+                %rangePupilDataAllTime = max(abs(amax-amin)); % range across trials
+                rangePupilDataAllTime = amaxtemp-amintemp; 
+                %rangePupilDataAllTime = rangePupilDataAllTime';
+                rangePupilDataAllTime = repmat(mean(rangePupilDataAllTime), nTrials, 1); 
+
+%                 % new way (compute range - 
+%                 aa = filteredPupilData; %(:, 1000:1800); %1300);
+%                 amaxtemp = max(aa'); amax = max(amaxtemp);
+%                 amintemp = min(aa'); amin = min(amintemp);
+%                 rangePupilDataAllTime = max(abs(amax-amin)); % range across trials (per session)
+
+%                 aa = filteredPupilData(:, 1000:1800); %1300);
+%                 amaxtemp = mean(aa'); amax = max(amaxtemp);
+%                 amintemp = mean(aa'); amin = min(amintemp);
+%                 rangePupilDataAllTime = amax-amin;
+%                 %rangePupilDataAllTime = amaxtemp-amintemp; %rangePupilDataAllTime = rangePupilDataAllTime'; % trialwise range
+%                 %disp('Range')
+%                 %rangePupilDataAllTime
+% 
+%                 %maxPupilData = max(filteredPupilData(:, minWindowStart:minWindowEnd), [], 2); % note the [] to specify the dimension
+%                 %[~, maxIndices] = max(minPupilData, [], 2); % Find minimum value and index for each row
+%                 %max(maxPupilData-minPupilData)
+%                 signalDiff = filteredPupilData - minPupilData;
+%                 filteredPupilData = ((signalDiff ./ rangePupilDataAllTime) * 100);
+% 
+%                 
+%                 %meanAllSignal = abs(nanmean(signalDiff, 'all'));
+%                 %filteredPupilData = (signalDiff ./ meanAllSignal) * 100; 
+
                 trialSignalSummary(:,1) = minPupilData;
-                trialSignalSummary(:,2) = meanPupilDataAllTime;
-                trialSignalSummary(:,3) = mean(meanPupilDataAllTime);
-                trialSignalSummary(:,4) = rangePupilDataAllTime;
-                trialSignalSummary(:,5) = mean(rangePupilDataAllTime);
+                %trialSignalSummary(:,2) = meanPupilDataAllTime;
+                trialSignalSummary(:,2) = rangePupilDataAllTime;
+                trialSignalSummary(:,3) = mean(meanPupilDataAllTime); %nanmax(nanmax(filteredPupilData)); %nanmedian(nanmedian(filteredPupilData)); %
+                %trialSignalSummary(:,3) = mean(rangePupilDataAllTime);
+                trialSignalSummary(:,4) = meanPupilDataAllTime;
+
+%                 % remove later
+%                 if plotOn
+%                     for di=1:nTrials
+%                         plot(filteredPupilData(di,:))
+%                         hold on
+%                         xline(stimStart, 'LineWidth',2)
+%                         hold on
+%                         xline(stimEnd, 'LineWidth',2)
+%                         hold on
+%                         xline(trialResponse, 'g')
+%                         hold on
+%                         xline(trialEnd, 'b')
+%                         hold on
+%                         if ~isnan(nextTrialStart)
+%                             xline(nextTrialStart, 'm')
+%                         end
+%                         hold off
+%                         xlim([1000 length(trimmed_array)]);
+%                         title(sprintf('Trial #%i', di))
+%                         pause(.3)
+%                         hold off
+%                     end
+%                 end
+
+
+
     
-                if plotOn
-                    hardTrials = filteredPupilData(tab(:,11)<4,:);
-                    easyTrials = filteredPupilData(tab(:,11)>=4,:);
-                    
-                    RT_hard = trialTimeStamps(tab(:,11)<4,3); 
-                    RT_easy = trialTimeStamps(tab(:,11)>=4,3); 
-                    
-                    medianRT_hard = mean(RT_hard(RT_hard<2000));
-                    medianRT_easy = mean(RT_easy(RT_easy<2000));
-                    
-                    figure
-                    plot(nanmedian(hardTrials,1), 'Color', [.5 .5 .5])
-                    hold on
-                    plot(nanmedian(easyTrials,1), 'k')
-                    hold on
-                    xline(1300, 'LineWidth',2)
-                    hold on
-                    xline(1800, 'LineWidth',2)
-                    hold on
-                    xline(medianRT_hard, 'r')
-                    hold on
-                    xline(medianRT_easy, 'g')
-                end
+%                 if plotOn
+%                     figure(2)
+%                     hardTrials = filteredPupilData(tab(:,11)<=4,:);
+%                     easyTrials = filteredPupilData(tab(:,11)>4,:);
+%                     
+%                     RT_hard = trialTimeStamps(tab(:,11)<=4,3); 
+%                     RT_easy = trialTimeStamps(tab(:,11)>4,3); 
+%                     
+%                     medianRT_hard = mean(RT_hard(RT_hard<2000));
+%                     medianRT_easy = mean(RT_easy(RT_easy<2000));
+%                     
+%                     plot(nanmedian(hardTrials,1), 'Color', [.5 .5 .5])
+%                     hold on
+%                     plot(nanmedian(easyTrials,1), 'k')
+%                     hold on
+%                     xline(1300, 'LineWidth',2)
+%                     hold on
+%                     xline(1800, 'LineWidth',2)
+%                     hold on
+%                     xline(medianRT_hard, 'r')
+%                     hold on
+%                     xline(medianRT_easy, 'g')
+% 
+% 
+%                     % card / oblique
+%                     figure(3)
+%                     easyTrialsIdx = find(ismember(tab(:,10), 5:8)); % & tabnew(:,14)==1; 
+%                     hardTrialsIdx = find(ismember(tab(:,10), 1:4)); % & tabnew(:,14)==1;
+%                     
+%                     hardTrials = filteredPupilData(hardTrialsIdx,:);
+%                     easyTrials = filteredPupilData(easyTrialsIdx,:);
+%                     
+%                     RT_hard = trialTimeStamps(hardTrialsIdx,3); 
+%                     RT_easy = trialTimeStamps(easyTrialsIdx,3); 
+%                     
+%                     medianRT_hard = mean(RT_hard(RT_hard<2000));
+%                     medianRT_easy = mean(RT_easy(RT_easy<2000));
+%                     
+%                     plot(nanmedian(hardTrials,1), 'Color', [51, 34, 136]/255)
+%                     hold on
+%                     plot(nanmedian(easyTrials,1), 'Color', [17, 119, 51]/255)
+%                     hold on
+%                     xline(1300, 'LineWidth',2)
+%                     hold on
+%                     xline(1800, 'LineWidth',2)
+%                     hold on
+%                     xline(medianRT_hard, 'r')
+%                     hold on
+%                     xline(medianRT_easy, 'g')
+% 
+%                 end
     
                 allfilteredPupilData{counter} = filteredPupilData;
                 alltrialTimeStamps{counter} = trialTimeStamps;
@@ -341,6 +454,100 @@ for ii = 4 : 4  % CHANGE BACK TO 1:2 if running s04!!
 
     allMSData = vertcat(allMSData{:});
 
+    % put back!!
+    %allfilteredPupilData = (allfilteredPupilData ./ max(alltrialSignalSummary(:,2))) * 100; % divide by max range
+    %allfilteredPupilData = (allfilteredPupilData ./ alltrialSignalSummary(:,2)) * 100; 
+
+    %deno = (max(alltrialSignalSummary(:,2))*(max(alltrialSignalSummary(:,2))./(alltrialSignalSummary(:,2))));
+    %allfilteredPupilData = (allfilteredPupilData ./ alltrialSignalSummary(:,2)) * 100; % divide by max range
+
+    allfilteredPupilData = (allfilteredPupilData - nanmean(nanmean(allfilteredPupilData))) ./ abs(nanmean(nanmean(allfilteredPupilData)));
+
+    if plotOn
+        figure
+        hardTrials = allfilteredPupilData(alltab(:,11)<=4,:);
+        easyTrials = allfilteredPupilData(alltab(:,11)>4,:);
+        
+        RT_hard = alltrialTimeStamps(alltab(:,11)<=4,3); 
+        RT_easy = alltrialTimeStamps(alltab(:,11)>4,3); 
+        
+        medianRT_hard = mean(RT_hard(RT_hard<2000));
+        medianRT_easy = mean(RT_easy(RT_easy<2000));
+        
+        plot(nanmean(hardTrials,1), 'Color', [.5 .5 .5])
+        hold on
+        plot(nanmedian(easyTrials,1), 'k')
+        hold on
+        xline(1300, 'LineWidth',2)
+        hold on
+        xline(1800, 'LineWidth',2)
+        hold on
+        xline(medianRT_hard, 'r')
+        hold on
+        xline(medianRT_easy, 'g')
+
+
+        % card / oblique
+        figure
+        easyTrialsIdx = find(ismember(alltab(:,10), 5:8)); % & tabnew(:,14)==1; 
+        hardTrialsIdx = find(ismember(alltab(:,10), 1:4)); % & tabnew(:,14)==1;
+        
+        hardTrials = allfilteredPupilData(hardTrialsIdx,:);
+        easyTrials = allfilteredPupilData(easyTrialsIdx,:);
+        
+        RT_hard = alltrialTimeStamps(hardTrialsIdx,3); 
+        RT_easy = alltrialTimeStamps(easyTrialsIdx,3); 
+        
+        medianRT_hard = mean(RT_hard(RT_hard<2000));
+        medianRT_easy = mean(RT_easy(RT_easy<2000));
+        
+        plot(nanmedian(hardTrials,1), 'Color', [51, 34, 136]/255)
+        hold on
+        plot(nanmedian(easyTrials,1), 'Color', [17, 119, 51]/255)
+        hold on
+        xline(1300, 'LineWidth',2)
+        hold on
+        xline(1800, 'LineWidth',2)
+        hold on
+        xline(medianRT_hard, 'r')
+        hold on
+        xline(medianRT_easy, 'g')
+
+        figure
+        subplot(1,3,1)
+        scatter(ones(length(easyTrialsIdx),1), alltrialSignalSummary(easyTrialsIdx,2), 'b')
+        hold on
+        scatter(1, mean(alltrialSignalSummary(easyTrialsIdx,2)),300, 'b+', 'LineWidth', 3)
+        hold on
+        scatter(1+ones(length(hardTrialsIdx),1), alltrialSignalSummary(hardTrialsIdx,2), 'r')
+        hold on
+        scatter(2, mean(alltrialSignalSummary(hardTrialsIdx,2)),300, 'r+', 'LineWidth', 3)
+        title('range')
+        xlim([0, 3])
+        subplot(1,3,2)
+        scatter(ones(length(easyTrialsIdx),1), alltrialSignalSummary(easyTrialsIdx,3), 'b')
+        hold on
+        scatter(1, mean(alltrialSignalSummary(easyTrialsIdx,3)),300, 'b+', 'LineWidth', 3)
+        hold on
+        scatter(1+ones(length(hardTrialsIdx),1), alltrialSignalSummary(hardTrialsIdx,3), 'r')
+        hold on
+        scatter(2, mean(alltrialSignalSummary(hardTrialsIdx,3)),300, 'r+', 'LineWidth', 3)
+        xlim([0, 3])
+        title('session mean')
+        subplot(1,3,3)
+        scatter(ones(length(easyTrialsIdx),1), alltrialSignalSummary(easyTrialsIdx,4), 'b')
+        hold on
+        scatter(1, mean(alltrialSignalSummary(easyTrialsIdx,4)),300, 'b+', 'LineWidth', 3)
+        hold on
+        scatter(1+ones(length(hardTrialsIdx),1), alltrialSignalSummary(hardTrialsIdx,4), 'r')
+        hold on
+        scatter(2, mean(alltrialSignalSummary(hardTrialsIdx,4)),300, 'r+', 'LineWidth', 3)
+        title('trial mean')
+        xlim([0, 3])
+
+    end
+
+
     % save it out
     save(fullfile(savePath,sprintf('%s_allpupilData.mat', subj)), 'allfilteredPupilData', 'alltrialTimeStamps', 'alltab', 'alltrialSignalSummary');
     save(fullfile(strrep(savePath, 'pupil', 'microsaccades'), sprintf('%s_allmsData.mat', subj)), 'allMSData');
@@ -356,7 +563,7 @@ condlabels = {'trial'}; % arbitrary
 baseline = []; % empty because I did the normalization myself a different way    
 wnum = 1;
 
-for ii =1:1
+for ii =4:4
     subj = subjects{ii};
     savePath = sprintf('%s/%s/ProcessedData/Summary/pupil', datadir, subj);
     load(fullfile(savePath,sprintf('%s_allpupilData.mat', subj)));
@@ -372,8 +579,8 @@ for ii =1:1
     
     tic
     
-    %parfor trialNum=1:nTrials
-    for trialNum=35 %20 %12 %1:nTrials
+    parfor trialNum=1:nTrials
+    %for trialNum=35 %20 %12 %1:nTrials
     
         if mod(trialNum, 100) == 0
             sprintf('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Trial# %i ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~', trialNum)
@@ -469,7 +676,7 @@ for ii =1:1
         % use these lines (you'll want to turn off the optimization plots for this):
         %options.trialmode = 'single';
         
-        options.pret_estimate.pret_optim.optimplotflag = true; %false;
+        options.pret_estimate.pret_optim.optimplotflag = false; %true; %
         
         sj = pret_estimate_sj(sj,model,wnum,options);
     
@@ -493,8 +700,8 @@ for ii =1:1
     toc
     
     % save it out
-    %save(fullfile(savePath,sprintf('%s_allpupilFits.mat', subj)), 'output');
-    %delete(gcp); % shut down parallel pool
+    save(fullfile(savePath,sprintf('%s_allpupilFits.mat', subj)), 'output');
+    delete(gcp); % shut down parallel pool
 end
 
 %% helpers
@@ -513,3 +720,4 @@ function padded_array = pad_zeros(array, pad_size)
         padded_array(idx+1:end_pad) = 0;
     end
 end
+

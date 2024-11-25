@@ -9,7 +9,7 @@ subjects = jsonParams.subjects.Subjectids;
 protocols = jsonParams.protocols.Protocolids; 
 datadir = jsonParams.datadir.Path; 
 nSampleCutOff = 4000; % or 2500; %
-analysis_type = 'direction'; %'direction'; %'direction'; % 'tilt'; %'location'
+analysis_type = 'tilt'; %'direction'; %'direction'; % 'tilt'; %'location'
 
 gausWindowSize = 100;
 x = (1 : nSampleCutOff) - 1300;
@@ -167,6 +167,16 @@ for si=1:length(sig_cluster)
     segLength = length(sig_cluster{si}(1:end));
     plot(sig_cluster{si}(1:end)-300, ones(1,segLength).*(yLimits(2)*.85), 'LineWidth',2, 'Color', 'k'); %color{1}/255);
     hold on % plot multiple clusters
+
+    % compute cohen's d:
+    % 1) take the pairwise difference
+    effectDiff = pairwiseSummary.(fieldNames{1}) - pairwiseSummary.(fieldNames{2});
+    deltas = effectDiff(:, sig_cluster{si});
+    meanDeltas = mean(deltas,1);
+    sdDeltas = nanstd(deltas);  % standard deviation of the diffferences
+    s        = sdDeltas;        % re-name
+    d_timepoint        =  meanDeltas ./ s;   % Cohen's d (paired version) per timepoint
+    d = mean(d_timepoint)
 end
 
 %set(gca, 'FontName', 'Arial', 'FontSize', 35);

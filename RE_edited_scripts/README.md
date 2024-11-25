@@ -78,7 +78,7 @@ Col 6: when EVENT_CLEAR_SCREEN prints
 Col 7: Broke fixation based on 1.5 degree criteria in experiment
 Col 8: TRIAL_END
 Col 9: polar angle location
-Col 10: motion direction
+Col 10: motion direction (cardinal directions 5:8, oblique directions 1:4)
 Col 11: tilt magnitude
 Col 12: direction with tilt offset
 Col 13: RT - 500

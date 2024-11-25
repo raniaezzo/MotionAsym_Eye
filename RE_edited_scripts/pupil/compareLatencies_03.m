@@ -66,9 +66,12 @@ if plotOn ~= 0
 end
 
 f6.Position = [135 739 1848 400];
+
+% get the scale factor for PSC
+psc_scaleFactor = nan(length(subjects), 1);
     
 %%
-for si=1:8 %1:length(subjects)
+for si=1:length(subjects)
 
     f1 = figure;
     subj=subjects{si};
@@ -76,6 +79,9 @@ for si=1:8 %1:length(subjects)
     savePath = sprintf('%s/%s/ProcessedData/Summary/pupil', datadir, subj);
     load(fullfile(savePath,sprintf('%s_allpupilFits.mat', subj)), 'output');
     load(fullfile(savePath,sprintf('%s_allpupilData.mat', subj))); % to load in tab file
+
+    psc_scaleFactor(si,1) = (nanmean(alltrialSignalSummary(:,2))/nanmax(alltrialSignalSummary(:,4)));
+
 
     rate = load(fullfile(strrep(savePath, 'pupil', 'microsaccades'), sprintf('%s_allmsData.mat', subj)));
 
@@ -123,6 +129,11 @@ for si=1:8 %1:length(subjects)
         smoothed_data = smoothdata(meanMS, 'movmean', window_size);
             
         decreasing_index = find(diff(smoothed_data(1800:end)) < 0, 1);
+
+        if isempty(decreasing_index)
+            decreasing_index = find(diff(smoothed_data(1800:end)) == 0, 1); % if the MS rate does not go back down, select when it plateaus
+        end
+
         postsupPeakTimes(selectTrials) = ones(length(selectTrials),1)*(decreasing_index+1800);
 
         [~,suppressionTime] = min(meanMS(stimonset:stimoffset)); 
@@ -321,8 +332,8 @@ for si=1:8 %1:length(subjects)
         varExp_hard = cell2mat({pupilFit_hard.('R2')});
 
         % which values do I need to plot the signal (reconstruction)?
-        pupilFit_easy_filt = pupilFit_easy(varExp_easy>0.5);
-        pupilFit_hard_filt = pupilFit_hard(varExp_hard>0.5);
+        pupilFit_easy_filt = pupilFit_easy(varExp_easy>0.50);
+        pupilFit_hard_filt = pupilFit_hard(varExp_hard>0.50);
 
         amp{ai}(si,1:3,1) = median(cell2mat({pupilFit_easy_filt.('ampvals')}'), 1);
         boxamp{ai}(si,1,1) = median(cell2mat({pupilFit_easy_filt.('boxampvals')}'), 1);
@@ -400,7 +411,7 @@ y_patch = [0, 0, 1, 1]; % y-coordinates
 
 %%
 for si=1:length(subjects)
-    subjectID = si;
+    subjectID = si
     subj = subjects{si};
     figure
     figName = sprintf('%s/%s/ProcessedData/Summary/figures/%s', datadir, subj, sprintf('%sprobDensityFunction', subj));
@@ -409,7 +420,7 @@ for si=1:length(subjects)
         analysis_type = analyses{ai};
     
         if strcmp(analysis_type, 'direction')
-            fieldNames = {'cardinal', 'oblique'};
+            fieldNames = {'cardinal', 'oblique'};     
             color = {[17, 119, 51],[51, 34, 136]}; 
         elseif strcmp(analysis_type, 'tilt')
             fieldNames = {'largeoffset','smalloffset'};
@@ -544,11 +555,21 @@ for si=1:length(subjects)
     width_inch = 893 / dpi;
     height_inch = 365 / dpi;
 
-    pathtoSave = '/Users/rje257/Desktop/oculomotor_manuscript_figures/';
-    set(gcf, 'PaperOrientation', 'landscape');
-    set(gcf, 'PaperUnits', 'inches', 'PaperSize', [11.69, 8.27]);
-    print(gcf, '-dpdf', fullfile(pathtoSave,'fig6.pdf'));  % for PDF
+    %pathtoSave = '/Users/rje257/Desktop/oculomotor_manuscript_figures/';
+    %set(gcf, 'PaperOrientation', 'landscape');
+    %set(gcf, 'PaperUnits', 'inches', 'PaperSize', [11.69, 8.27]);
+    %print(gcf, '-dpdf', fullfile(pathtoSave,'fig6.pdf'));  % for PDF
 end
+
+%%
+
+ai= 1;
+[nu, val, ci, stats] = ttest(probDelay(:,2,ai), probDelay(:,1,ai))
+d = computeCohen_d(probDelay(:,2,ai), probDelay(:,1,ai), 'paired')
+
+ai= 2;
+[nu, val, ci, stats] = ttest(probDelay(:,2,ai), probDelay(:,1,ai))
+d = computeCohen_d(probDelay(:,2,ai), probDelay(:,1,ai), 'paired')
 
 %% RT vs Probability Density
 
@@ -863,7 +884,7 @@ for ai=1:2 %2 %length(analyses)
         lincol1 = 'k';
         alphlev2 = 0.5;
         lincol2 = 'k';
-        condComparison = '(card - obl)';
+        condComparison = '(obl - card)';
     elseif strcmp(analysis_type, 'tilt')
         fieldNames = {'largeoffset','smalloffset'};
         color = {[0, 0, 0],[175, 175, 175]}; 
@@ -871,7 +892,7 @@ for ai=1:2 %2 %length(analyses)
         lincol1 = 'k';
         alphlev2 = 0.5;
         lincol2 = 'k';
-        condComparison = '(large - small)';
+        condComparison = '(small - large)';
     elseif strcmp(analysis_type, 'location')
         fieldNames = {'horizontalLoc','verticalLoc'};
         color = {[0, 0, 0],[175, 175, 175]}; 
@@ -923,6 +944,7 @@ for ai=1:2 %2 %length(analyses)
     %subplot(1,length(analyses),ai)
     subplot(1,2,ai)
     [nu, val, ci, stats] = ttest((latvals{ai}(:,1,2)+eventtimes{ai}(:,1,2)+930)-(latvals{ai}(:,1,1)+eventtimes{ai}(:,1,1)+930))
+    %d = computeCohen_d((latvals{ai}(:,1,2)+eventtimes{ai}(:,1,2)+930), (latvals{ai}(:,1,1)+eventtimes{ai}(:,1,1)+930), 'paired')
     hold on
     scatter(jittered_vector+ones(length(latvals{ai}(:,1,1)),1), latvals{ai}(:,1,1)+eventtimes{ai}(:,1,1)+930, 250, 'filled', 'MarkerFaceColor', color{1}/255, 'MarkerEdgeColor', lincol1, 'LineWidth', 2, 'MarkerFaceAlpha', alphlev1)
     hold on
@@ -931,6 +953,7 @@ for ai=1:2 %2 %length(analyses)
     plot([jittered_vector+1 jittered_vector+3]', [latvals{ai}(:,1,1)+eventtimes{ai}(:,1,1)+930, latvals{ai}(:,1,2)+eventtimes{ai}(:,1,2)+930]', 'k', 'LineWidth', 1)
     hold on
     [nu, val, ci, stats] = ttest((latvals{ai}(:,2,2)+eventtimes{ai}(:,2,2)+930)-(latvals{ai}(:,2,1)+eventtimes{ai}(:,2,1)+930))
+    %d = computeCohen_d((latvals{ai}(:,2,2)+eventtimes{ai}(:,2,2)+930), (latvals{ai}(:,2,1)+eventtimes{ai}(:,2,1)+930), 'paired')
     hold on
     scatter(jittered_vector+(5*ones(length(latvals{ai}(:,2,1)),1)), latvals{ai}(:,2,1)+eventtimes{ai}(:,2,1)+930, 250, 'filled', 'MarkerFaceColor', color{1}/255, 'MarkerEdgeColor', lincol1, 'LineWidth', 2, 'MarkerFaceAlpha', alphlev1)
     hold on
@@ -939,6 +962,7 @@ for ai=1:2 %2 %length(analyses)
     plot([jittered_vector+5 jittered_vector+7]', [latvals{ai}(:,2,1)+eventtimes{ai}(:,2,1)+930, latvals{ai}(:,2,2)+eventtimes{ai}(:,2,2)+930]', 'k', 'LineWidth', 1)
     hold on
     [nu, val, ci, stats] = ttest((latvals{ai}(:,3,2)+eventtimes{ai}(:,3,2)+930)-(latvals{ai}(:,3,1)+eventtimes{ai}(:,3,1)+930))
+     %d = computeCohen_d((latvals{ai}(:,3,2)+eventtimes{ai}(:,3,2)+930), (latvals{ai}(:,2,1)+eventtimes{ai}(:,2,1)+930), 'paired')
     scatter(jittered_vector+(9*ones(length(latvals{ai}(:,3,1)),1)), latvals{ai}(:,3,1)+eventtimes{ai}(:,3,1)+930, 250, 'filled', 'MarkerFaceColor', color{1}/255, 'MarkerEdgeColor', lincol1, 'LineWidth', 2, 'MarkerFaceAlpha', alphlev1)
     hold on
     scatter(jittered_vector+(11*ones(length(latvals{ai}(:,3,2)),1)), latvals{ai}(:,3,2)+eventtimes{ai}(:,3,2)+930, 250, 'filled', 'MarkerFaceColor', color{2}/255, 'MarkerEdgeColor', lincol2, 'LineWidth', 2, 'MarkerFaceAlpha', alphlev2)
@@ -964,8 +988,9 @@ for ai=1:2 %2 %length(analyses)
     %subplot(1,length(analyses),ai)
     subplot(1,2,ai)
     [nsubs, ~] = size(amp{ai}(:,1,1));
-    psc1 = (amp{ai}(:,1,2)-amp{ai}(:,1,1));
+    psc1 = ((amp{ai}(:,1,2).*psc_scaleFactor)-(amp{ai}(:,1,1).*psc_scaleFactor));
     [nu, val, ci, stats] = ttest(psc1)
+    d = computeCohen_d(amp{ai}(:,1,2),amp{ai}(:,1,1), 'paired')
     hold on
     sed1 = nanstd(psc1) / sqrt(nsubs);
     scatter(jittered_vector+(1.5*ones(length(amp{ai}(:,1,1)),1)), psc1, 250, 'filled', 'MarkerFaceColor', 'b', 'MarkerEdgeColor', 'k', 'LineWidth', 2, 'MarkerFaceAlpha', 0.2) 
@@ -976,8 +1001,9 @@ for ai=1:2 %2 %length(analyses)
     hold on
     %boxplot(amp{ai}(:,1,2)-amp{ai}(:,1,1), 'Whisker', 1.5, 'Positions', 1.5, 'Widths', 1);
     hold on
-    psc2 = (amp{ai}(:,2,2)-amp{ai}(:,2,1));
+    psc2 = ((amp{ai}(:,2,2).*psc_scaleFactor)-(amp{ai}(:,2,1).*psc_scaleFactor));
     [nu, val, ci, stats] = ttest(psc2)
+    d = computeCohen_d(amp{ai}(:,2,2),amp{ai}(:,2,1), 'paired')
     sed2 = nanstd(psc2) / sqrt(nsubs);
     hold on
     scatter(jittered_vector+(5.5*ones(length(amp{ai}(:,2,1)),1)), psc2, 250, 'filled', 'MarkerFaceColor', 'b', 'MarkerEdgeColor', 'k', 'LineWidth', 2, 'MarkerFaceAlpha', 0.2) 
@@ -988,8 +1014,9 @@ for ai=1:2 %2 %length(analyses)
     hold on
     %boxplot(amp{ai}(:,2,2)-amp{ai}(:,2,1), 'Whisker', 1.5, 'Positions', 4.5, 'Widths', 1);
     hold on   
-    psc3 = (amp{ai}(:,3,2)-amp{ai}(:,3,1));
+    psc3 = ((amp{ai}(:,3,2).*psc_scaleFactor)-(amp{ai}(:,3,1).*psc_scaleFactor));
     [nu, val, ci, stats] = ttest(psc3)
+    d = computeCohen_d(amp{ai}(:,3,2),amp{ai}(:,3,1), 'paired')
     sed3 = nanstd(psc3) / sqrt(nsubs);
     scatter(jittered_vector+(9.5*ones(length(amp{ai}(:,3,1)),1)), psc3, 250, 'filled', 'MarkerFaceColor', 'b', 'MarkerEdgeColor', 'k', 'LineWidth', 2, 'MarkerFaceAlpha', 0.2) 
     hold on
@@ -998,8 +1025,9 @@ for ai=1:2 %2 %length(analyses)
     %scatter(7.5, nanmean(psc3), 200, 'filled', 'MarkerFaceColor', 'b', 'MarkerEdgeColor', 'w', 'LineWidth', 3);
     hold on
     %boxplot(amp{ai}(:,3,2)-amp{ai}(:,3,1), 'Whisker', 1.5, 'Positions', 7.5, 'Widths', 1);
-    psc4 = (boxamp{ai}(:,1,2)-boxamp{ai}(:,1,1));
+    psc4 = ((boxamp{ai}(:,1,2).*psc_scaleFactor)-(boxamp{ai}(:,1,1).*psc_scaleFactor));
     [nu, val, ci, stats] = ttest(psc4)
+    d = computeCohen_d(boxamp{ai}(:,1,2),boxamp{ai}(:,1,1), 'paired')
     sed4 = nanstd(psc4) / sqrt(nsubs);
     scatter(jittered_vector+(13.5*ones(length(boxamp{ai}(:,1,1)),1)), psc4, 250, 'filled', 'MarkerFaceColor', 'w', 'MarkerEdgeColor', 'b', 'LineWidth', 2, 'MarkerFaceAlpha', 0.2)
     hold on
@@ -1103,11 +1131,20 @@ for fi=[f1, f2,f3] %, f4]
     set(gcf, 'PaperPositionMode', 'auto'); 
 
     %set(gca, 'LineWidth', 1);
-    print(gcf, '-dpdf', fullfile(pathtoSave,sprintf('fig%s.pdf', figName)));  % for PDF
+    tmp = strsplit(figName, '/');
+    %print(gcf, '-dpdf', fullfile(pathtoSave,sprintf('fig%s.pdf', figName)));  % for PDF tmp{8}))); %
 
     %saveas(gca, strcat(figName, '.fig')); % Save as FIG format
     %saveas(gca, strcat(figName, '.pdf')); % Save as PDF format
 end
+
+pathtoSave = '/Users/rje257/Desktop/oculomotor_manuscript_figures/';
+set(gcf, 'PaperOrientation', 'landscape');
+set(gcf, 'PaperUnits', 'inches', 'PaperSize', [11.69, 8.27]);
+%set(gcf, 'PaperPositionMode', 'auto'); 
+
+%set(gca, 'LineWidth', 1);
+print(gcf, '-dpdf', fullfile(pathtoSave,'fig9.pdf'));  % for PDF
 
 %% raw data
 
